@@ -1,0 +1,281 @@
+{% extends 'allianceauth/base-bs5.html' %}
+{% block page_title %}SOV Monitor{% endblock %}
+
+{% block header_nav_brand %}SOV Monitor{% endblock %}
+
+{% block header_nav_collapse_left %}
+<li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-systems" type="button">
+        Systeme <span class="badge bg-secondary">{{ systems|length }}</span>
+    </button>
+</li>
+<li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-upgrades" type="button">
+        Upgrades <span class="badge bg-secondary">{{ upgrade_count }}</span>
+    </button>
+</li>
+<li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-campaigns" type="button">
+        Campaigns{% if active_campaigns %} <span class="badge bg-danger">{{ active_campaigns }}</span>{% endif %}
+    </button>
+</li>
+<li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rift" type="button">RIFT Export</button>
+</li>
+{% if perms.aa_sov_monitor.view_manager %}
+<li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-manager" type="button">Manager</button>
+</li>
+{% endif %}
+{% endblock %}
+
+{% block header_nav_collapse_right %}
+{% if perms.aa_sov_monitor.manage_sov %}
+<li class="nav-item">
+    <a href="{% url 'aa_sov_monitor:add_owner' %}" class="btn btn-primary btn-sm">+ Alliance hinzufügen</a>
+</li>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="text-muted small mb-3">
+        {% for owner in owners %}
+            {{ owner.alliance.alliance_name }}:
+            {% if owner.last_updated %}Sync {{ owner.last_updated|date:"d.m.Y H:i" }} UTC{% else %}noch kein Sync{% endif %}
+            {% if not forloop.last %} &bull; {% endif %}
+        {% endfor %}
+    </div>
+    <div class="tab-content">
+
+        <div class="tab-pane fade show active" id="tab-systems">
+            {% if not systems %}
+            <div class="alert alert-info">Keine Systeme. Alliance hinzufügen und Sync abwarten.</div>
+            {% else %}
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Region</th>
+                        <th>Konstellation</th>
+                        <th>System</th>
+                        <th>ADM</th>
+                        <th class="text-center">IHUB</th>
+                        <th>Vuln Start</th>
+                        <th>Vuln End</th>
+                        <th>Alliance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for system in systems %}
+                <tr>
+                    <td>{{ system.region_name }}</td>
+                    <td>{{ system.constellation_name }}</td>
+                    <td>{{ system.solar_system_name }}</td>
+                    <td>
+                        {% if system.adm <= 2 %}<span class="badge bg-danger">{{ system.adm|floatformat:0 }}</span>
+                        {% elif system.adm <= 3 %}<span class="badge bg-warning text-dark">{{ system.adm|floatformat:0 }}</span>
+                        {% elif system.adm <= 4 %}<span class="badge bg-info">{{ system.adm|floatformat:0 }}</span>
+                        {% else %}<span class="badge bg-success">{{ system.adm|floatformat:0 }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{% if system.has_ihub %}<span class="text-success">&#10003;</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
+                    <td class="text-nowrap">{% if system.vulnerable_start %}{{ system.vulnerable_start|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
+                    <td class="text-nowrap">{% if system.vulnerable_end %}{{ system.vulnerable_end|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
+                    <td>{{ system.owner.alliance.alliance_name }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="tab-upgrades">
+            {% if not pivot_rows %}
+            <div class="alert alert-info">Keine Upgrade-Daten. Upgrade-Sync abwarten.</div>
+            {% else %}
+            <div class="row g-2 mb-3">
+                <div class="col-auto">
+                    <select id="pf-const" class="form-select form-select-sm" onchange="applyPF()">
+                        <option value="">Alle Konstellationen</option>
+                        {% for c in upgrade_constellations %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <select id="pf-type" class="form-select form-select-sm" onchange="applyPF()">
+                        <option value="">Alle Upgrade-Typen</option>
+                        {% for col in ordered_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <select id="pf-level" class="form-select form-select-sm" onchange="applyPF()">
+                        <option value="">Alle Stufen</option>
+                        {% for l in upgrade_levels %}<option value="{{ l }}">Stufe {{ l }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetPF()">Zurücksetzen</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle" id="pivot-table" style="font-size:0.85rem">
+                <thead>
+                    <tr class="table-dark">
+                        <th>Region</th>
+                        <th>Konst.</th>
+                        <th>System</th>
+                        {% for col in ordered_cols %}
+                        <th class="text-center">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in pivot_rows %}
+                <tr data-constellation="{{ row.system.constellation_name }}">
+                    <td>{{ row.system.region_name }}</td>
+                    <td>{{ row.system.constellation_name }}</td>
+                    <td class="text-nowrap">{{ row.system.solar_system_name }}</td>
+                    {% for col_name, cell in row.cells %}
+                    <td class="text-center pc" data-col="{{ col_name }}" data-lv="{{ cell.0|default:0 }}">
+                        {% if cell.0 %}
+                            {% if cell.1 == 'Online' %}<span class="badge bg-success">{{ cell.0 }}</span>
+                            {% elif cell.1 == 'Anchored' %}<span class="badge bg-warning text-dark">{{ cell.0 }}</span>
+                            {% else %}<span class="badge bg-danger">{{ cell.0 }}</span>
+                            {% endif %}
+                        {% else %}<span class="text-muted" style="opacity:0.2">&mdash;</span>{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="tab-campaigns">
+            {% if not campaigns %}
+            <div class="alert alert-success">Keine aktiven SOV-Angriffe.</div>
+            {% else %}
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>System</th>
+                        <th>Typ</th>
+                        <th>Angreifer</th>
+                        <th>Verteidiger</th>
+                        <th>Start (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for c in campaigns %}
+                <tr class="table-danger">
+                    <td>{{ c.solar_system_name }}</td>
+                    <td>{{ c.event_type }}</td>
+                    <td>{{ c.attacker_score|floatformat:2 }}</td>
+                    <td>{{ c.defender_score|floatformat:2 }}</td>
+                    <td class="text-nowrap">{{ c.start_time|date:"d.m. H:i" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="tab-rift">
+            <p class="text-muted small mb-2">IHUB-Upgrade-Daten in RIFT importieren.</p>
+            {% if rift_text %}
+            <textarea id="riftExport" class="form-control font-monospace mb-2" rows="15" readonly>{{ rift_text }}</textarea>
+            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('riftExport').value).then(() => this.textContent='Kopiert!')">In Zwischenablage kopieren</button>
+            {% else %}
+            <div class="alert alert-info">Keine IHUB-Upgrade-Daten vorhanden.</div>
+            {% endif %}
+        </div>
+
+
+        {% if perms.aa_sov_monitor.view_manager %}
+        <div class="tab-pane fade" id="tab-manager">
+            {% if not manager_rows %}
+            <div class="alert alert-info">Keine Hub-Daten. Upgrade-Sync abwarten.</div>
+            {% else %}
+            <table class="table table-sm table-hover align-middle" style="font-size:0.85rem">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Konst.</th>
+                        <th>System</th>
+                        <th class="text-center">Power</th>
+                        <th class="text-center">Workforce</th>
+                        <th>Reagent</th>
+                        <th>Vuln Start</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in manager_rows %}
+                <tr>
+                    <td class="text-muted">{{ row.system.constellation_name }}</td>
+                    <td class="text-nowrap">{{ row.system.solar_system_name }}</td>
+                    <td class="text-center">
+                        <div title="{{ row.power_allocated }}/{{ row.power_available }}" style="width:90px;margin:0 auto">
+                            <div class="progress mb-1" style="height:6px">
+                                <div class="progress-bar {% if row.power_pct > 90 %}bg-danger{% elif row.power_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                     style="width:{{ row.power_pct }}%"></div>
+                            </div>
+                            <small class="{% if row.power_pct > 90 %}text-danger{% elif row.power_pct > 70 %}text-warning{% else %}text-success{% endif %}">{{ row.power_pct }}%</small>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <div title="{{ row.wf_allocated }}/{{ row.wf_available }}" style="width:90px;margin:0 auto">
+                            <div class="progress mb-1" style="height:6px">
+                                <div class="progress-bar {% if row.wf_pct > 90 %}bg-danger{% elif row.wf_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                     style="width:{{ row.wf_pct }}%"></div>
+                            </div>
+                            <small class="{% if row.wf_pct > 90 %}text-danger{% elif row.wf_pct > 70 %}text-warning{% else %}text-success{% endif %}">{{ row.wf_pct }}%</small>
+                        </div>
+                    </td>
+                    <td class="text-nowrap">
+                        {% for r in row.reagents %}
+                            {% if r.hours %}
+                                {% if r.hours < 24 %}<span class="text-danger fw-bold">&#9888; {{ r.hours }}h</span>
+                                {% elif r.hours < 72 %}<span class="text-warning">{{ r.hours }}h</span>
+                                {% else %}<span class="text-success">{{ r.hours }}h</span>{% endif %}
+                            {% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                        {% empty %}&mdash;{% endfor %}
+                    </td>
+                    <td class="text-nowrap text-muted">{% if row.system.vulnerable_start %}{{ row.system.vulnerable_start|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_javascript %}
+<script>
+function applyPF() {
+    var cf = document.getElementById('pf-const').value;
+    var tf = document.getElementById('pf-type').value;
+    var lf = document.getElementById('pf-level').value;
+    document.querySelectorAll('#pivot-table tbody tr').forEach(function(row) {
+        if (cf && row.dataset.constellation !== cf) { row.style.display='none'; return; }
+        if (tf) {
+            var cell = row.querySelector('.pc[data-col="' + tf + '"]');
+            if (!cell || cell.dataset.lv === '0') { row.style.display='none'; return; }
+        }
+        if (lf) {
+            var found = false;
+            row.querySelectorAll('.pc').forEach(function(c) { if (c.dataset.lv === lf) found=true; });
+            if (!found) { row.style.display='none'; return; }
+        }
+        row.style.display='';
+    });
+}
+function resetPF() {
+    ['pf-const','pf-type','pf-level'].forEach(function(id){ document.getElementById(id).value=''; });
+    applyPF();
+}
+</script>
+{% endblock %}
