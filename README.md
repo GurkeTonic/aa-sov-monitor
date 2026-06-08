@@ -2,8 +2,8 @@
 
 [![Release](https://img.shields.io/github/v/release/GurkeTonic/aa-sov-monitor?label=release)](https://github.com/GurkeTonic/aa-sov-monitor/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green)](https://github.com/GurkeTonic/aa-sov-monitor/blob/main/LICENSE)
-[![Python](https://img.shields.io/pypi/pyversions/aa-sov-monitor)](https://pypi.org/project/aa-sov-monitor/)
-[![Django](https://img.shields.io/pypi/frameworkversions/django/aa-sov-monitor?label=django)](https://pypi.org/project/aa-sov-monitor/)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/django-4.2%2B-green)](https://www.djangoproject.com/)
 [![Alliance Auth Compatibility](https://img.shields.io/badge/Alliance_Auth-v5-brightgreen)](https://gitlab.com/allianceauth/allianceauth)
 
 An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin for EVE Online sovereignty monitoring.
