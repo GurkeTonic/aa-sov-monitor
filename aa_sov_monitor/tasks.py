@@ -362,7 +362,8 @@ def update_owner_sov_upgrades(owner_pk):
         return
     corp_id = owner.character.corporation_id
     try:
-        hubs = _esi_get_auth_pages(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
+        hubs_resp = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
+        hubs = hubs_resp.get('sovereignty_hubs', []) if isinstance(hubs_resp, dict) else hubs_resp
     except Exception as e:
         logger.error('Failed to fetch hub list for %s: %s', owner, e)
         return

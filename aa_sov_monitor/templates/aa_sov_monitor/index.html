@@ -97,9 +97,10 @@
                     {% for col_name, cell in row.cells %}
                     <td class="text-center pc" data-col="{{ col_name }}" data-lv="{{ cell.0|default:0 }}">
                         {% if cell.0 %}
-                            {% if cell.1 == 'Online' %}<span class="badge bg-success">{{ cell.0 }}</span>
-                            {% elif cell.1 == 'Anchored' %}<span class="badge bg-warning text-dark">{{ cell.0 }}</span>
-                            {% else %}<span class="badge bg-danger">{{ cell.0 }}</span>
+                            {% if cell.1 == 'Online' or cell.1 == 'Low' %}<span class="badge bg-success">{{ cell.0 }}</span>
+                            {% elif cell.1 == 'Pending' %}<span class="badge bg-secondary" title="Pending">{{ cell.0 }}</span>
+                            {% elif cell.1 == 'Offline' %}<span class="badge bg-danger">{{ cell.0 }}</span>
+                            {% else %}<span class="badge bg-danger" title="{{ cell.1 }}">{{ cell.0 }}</span>
                             {% endif %}
                         {% else %}<span class="text-muted" style="opacity:0.2">&mdash;</span>{% endif %}
                     </td>
@@ -265,6 +266,30 @@
 
 {% block extra_javascript %}
 <script>
+(function() {
+    var key = 'sovMonitorTab';
+    var saved = localStorage.getItem(key);
+    if (saved) {
+        var btn = document.querySelector('[data-bs-target="' + saved + '"]');
+        if (btn) {
+            document.querySelectorAll('.tab-pane.show.active').forEach(function(p) {
+                p.classList.remove('show', 'active');
+            });
+            document.querySelectorAll('[data-bs-toggle="tab"].active').forEach(function(b) {
+                b.classList.remove('active');
+            });
+            btn.classList.add('active');
+            var pane = document.querySelector(saved);
+            if (pane) pane.classList.add('show', 'active');
+        }
+    }
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function(btn) {
+        btn.addEventListener('shown.bs.tab', function(e) {
+            localStorage.setItem(key, e.target.getAttribute('data-bs-target'));
+        });
+    });
+})();
+
 function applyPF() {
     var cf = document.getElementById('pf-const').value;
     var tf = document.getElementById('pf-type').value;
