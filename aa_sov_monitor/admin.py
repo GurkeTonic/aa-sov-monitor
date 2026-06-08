@@ -1,9 +1,15 @@
 from django.contrib import admin
-from .models import SovConfiguration, SovOwner, SovSystem, SovCampaign, SovUpgrade, SovHubResource, SovHubReagent
+from .models import SovConfiguration, SovOwner, SovSystem, SovCampaign, SovUpgrade, SovHubResource, SovHubReagent, AdmHistory
 
 
 @admin.register(SovConfiguration)
 class SovConfigurationAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ('Discord Webhooks', {
+            'fields': ('discord_webhook_url', 'webhook_adm', 'webhook_reagent', 'webhook_module'),
+        }),
+    )
+
     def has_add_permission(self, request):
         return not SovConfiguration.objects.exists()
 
@@ -53,3 +59,10 @@ class SovHubResourceAdmin(admin.ModelAdmin):
 class SovHubReagentAdmin(admin.ModelAdmin):
     list_display = ['system', 'type_name', 'amount', 'burning_per_hour']
     search_fields = ['type_name', 'system__solar_system_name']
+
+
+@admin.register(AdmHistory)
+class AdmHistoryAdmin(admin.ModelAdmin):
+    list_display = ['system', 'adm', 'industrial_level', 'military_level', 'strategic_level', 'recorded_at']
+    list_filter = ['recorded_at']
+    search_fields = ['system__solar_system_name']

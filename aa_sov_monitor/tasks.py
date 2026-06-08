@@ -1,3 +1,4 @@
+from datetime import timedelta
 from email.utils import parsedate_to_datetime
 
 import requests
@@ -10,14 +11,12 @@ from django.utils.dateparse import parse_datetime
 from allianceauth.services.hooks import get_extension_logger
 from esi.models import Token
 
-from .models import SovOwner, SovSystem, SovUpgrade, SovCampaign, SovConfiguration, SovHubResource, SovHubReagent
+from .models import SovOwner, SovSystem, SovUpgrade, SovCampaign, SovConfiguration, SovHubResource, SovHubReagent, AdmHistory
 
 logger = get_extension_logger(__name__)
 
 ESI_BASE = 'https://esi.evetech.net'
 ESI_HEADERS = {'X-Compatibility-Date': '2026-05-19'}
-TYPE_TCU = 32226
-TYPE_IHUB = 32458
 
 
 def _get_user_agent():
@@ -122,7 +121,7 @@ def _resolve_names(ids):
         return {}
     try:
         headers = {**ESI_HEADERS, 'User-Agent': _get_user_agent()}
-        resp = requests.post(f'{ESI_BASE}/universe/names/', json=list(ids), headers=headers, timeout=30)
+        resp = requests.post(f'{ESI_BASE}/universe/names', json=list(ids), headers=headers, timeout=30)
         _handle_esi_response(resp)
         return {item['id']: item['name'] for item in resp.json()}
     except Exception as e:
@@ -146,7 +145,7 @@ def _get_system_details(system_ids):
     const_ids = set()
     for sys_id in remaining:
         try:
-            data = _esi_get(f'/universe/systems/{sys_id}/')
+            data = _esi_get(f'/universe/systems/{sys_id}')
             const_id = data.get('constellation_id')
             sys_const_map[sys_id] = const_id
             if const_id:
@@ -158,7 +157,7 @@ def _get_system_details(system_ids):
     region_ids = set()
     for const_id in const_ids:
         try:
-            data = _esi_get(f'/universe/constellations/{const_id}/')
+            data = _esi_get(f'/universe/constellations/{const_id}')
             region_id = data.get('region_id')
             const_region_map[const_id] = region_id
             if region_id:
@@ -203,6 +202,68 @@ def _send_campaign_alert(campaign):
         logger.error('Discord webhook failed: %s', e)
 
 
+def _send_adm_alert(systems, webhook_url):
+    fields = [
+        {
+            'name': s.solar_system_name,
+            'value': f'ADM: **{s.adm:.1f}** | Ind: {s.industrial_level} | Mil: {s.military_level} | Str: {s.strategic_level}',
+            'inline': False,
+        }
+        for s in systems
+    ]
+    embed = {
+        'title': f'⚠️ ADM Warning — {len(systems)} System{"e" if len(systems) > 1 else ""} unter 4.5',
+        'color': 0xFF6600,
+        'fields': fields,
+        'footer': {'text': 'AA SOV Monitor'},
+    }
+    try:
+        requests.post(webhook_url, json={'embeds': [embed]}, timeout=10)
+    except Exception as e:
+        logger.error('ADM alert webhook failed: %s', e)
+
+
+def _send_reagent_alert(system, level, reagents, webhook_url):
+    color = 0xFF0000 if level == 'critical' else 0xFF9900
+    label = 'CRITICAL' if level == 'critical' else 'Warning'
+    fields = [
+        {'name': r['name'], 'value': f"{r['hours']}h verbleibend", 'inline': True}
+        for r in reagents
+    ]
+    embed = {
+        'title': f'⚠️ Reagent {label} — {system.solar_system_name}',
+        'color': color,
+        'fields': fields,
+        'footer': {'text': 'AA SOV Monitor'},
+    }
+    try:
+        requests.post(webhook_url, json={'embeds': [embed]}, timeout=10)
+    except Exception as e:
+        logger.error('Reagent alert webhook failed: %s', e)
+
+
+def _send_module_alert(system, changes, webhook_url):
+    fields = []
+    for c in changes:
+        icon = '\U0001f534' if c['new'] != 'Online' else '\U0001f7e2'
+        fields.append({
+            'name': c['name'],
+            'value': f"{icon} {c['old']} → {c['new']}",
+            'inline': False,
+        })
+    any_offline = any(c['new'] != 'Online' for c in changes)
+    embed = {
+        'title': f'\U0001f514 Modul-Status — {system.solar_system_name}',
+        'color': 0xFF0000 if any_offline else 0x00CC44,
+        'fields': fields,
+        'footer': {'text': 'AA SOV Monitor'},
+    }
+    try:
+        requests.post(webhook_url, json={'embeds': [embed]}, timeout=10)
+    except Exception as e:
+        logger.error('Module alert webhook failed: %s', e)
+
+
 def _format_upgrade_for_rift(name):
     name = name.replace('Sovereignty Hub Upgrade: ', '')
     for roman, num in [(' III', ' 3'), (' II', ' 2'), (' I', ' 1')]:
@@ -219,51 +280,68 @@ def update_sov_data():
     alliance_ids = {o.alliance.alliance_id for o in owners}
     owner_map = {o.alliance.alliance_id: o for o in owners}
     try:
-        sov_map = _esi_get('/sovereignty/map/')
-        sov_structures = _esi_get('/sovereignty/structures/')
+        resp_data = _esi_get('/sovereignty/systems')
     except Exception as e:
-        logger.error('Failed to fetch sovereignty data: %s', e)
+        logger.error('Failed to fetch sovereignty systems: %s', e)
         return
-    our_entries = [s for s in sov_map if s.get('alliance_id') in alliance_ids]
-    our_system_ids = {s['system_id'] for s in our_entries}
+    all_systems = resp_data.get('solar_systems', [])
+    our_entries = []
+    for s in all_systems:
+        alliance_claim = s.get('claim', {}).get('alliance', {})
+        if alliance_claim.get('alliance_id') in alliance_ids:
+            our_entries.append({'solar_system_id': s['solar_system_id'], **alliance_claim})
+    our_system_ids = {e['solar_system_id'] for e in our_entries}
     details_map = _get_system_details(our_system_ids)
-    struct_map = {}
-    for struct in sov_structures:
-        sid = struct.get('solar_system_id')
-        if sid not in our_system_ids:
-            continue
-        if sid not in struct_map:
-            struct_map[sid] = {'has_ihub': False, 'has_tcu': False, 'adm': 0, 'vuln_start': None, 'vuln_end': None}
-        type_id = struct.get('structure_type_id')
-        if type_id == TYPE_IHUB:
-            struct_map[sid]['has_ihub'] = True
-            struct_map[sid]['adm'] = struct.get('vulnerability_occupancy_level', 0)
-            struct_map[sid]['vuln_start'] = parse_datetime(struct['vulnerable_start_time']) if struct.get('vulnerable_start_time') else None
-            struct_map[sid]['vuln_end'] = parse_datetime(struct['vulnerable_end_time']) if struct.get('vulnerable_end_time') else None
-        elif type_id == TYPE_TCU:
-            struct_map[sid]['has_tcu'] = True
+    now = timezone.now()
+    adm_history_records = []
+    updated_systems = []
     for entry in our_entries:
-        sys_id = entry['system_id']
+        sys_id = entry['solar_system_id']
         owner = owner_map[entry['alliance_id']]
-        s = struct_map.get(sys_id, {})
-        SovSystem.objects.update_or_create(
+        dev = entry.get('development') or {}
+        adm = dev.get('activity_defense_multiplier', 0)
+        hub = entry.get('sovereignty_hub') or {}
+        vuln = hub.get('vulnerability_window') or {}
+        system, _ = SovSystem.objects.update_or_create(
             solar_system_id=sys_id,
             defaults={
                 'owner': owner,
                 'solar_system_name': details_map.get(sys_id, (str(sys_id), '', ''))[0],
                 'constellation_name': details_map.get(sys_id, ('', '', ''))[1],
                 'region_name': details_map.get(sys_id, ('', '', ''))[2],
-                'adm': s.get('adm', 0),
-                'has_ihub': s.get('has_ihub', False),
-                'has_tcu': s.get('has_tcu', False),
-                'vulnerable_start': s.get('vuln_start'),
-                'vulnerable_end': s.get('vuln_end'),
+                'adm': adm,
+                'industrial_level': dev.get('industrial_level', 0),
+                'military_level': dev.get('military_level', 0),
+                'strategic_level': dev.get('strategic_level', 0),
+                'has_ihub': bool(hub),
+                'has_tcu': False,
+                'vulnerable_start': parse_datetime(vuln['start']) if vuln.get('start') else None,
+                'vulnerable_end': parse_datetime(vuln['end']) if vuln.get('end') else None,
             }
         )
+        updated_systems.append(system)
+        adm_history_records.append(AdmHistory(
+            system=system,
+            adm=adm,
+            industrial_level=dev.get('industrial_level', 0),
+            military_level=dev.get('military_level', 0),
+            strategic_level=dev.get('strategic_level', 0),
+        ))
+    if adm_history_records:
+        AdmHistory.objects.bulk_create(adm_history_records)
+    AdmHistory.objects.filter(recorded_at__lt=now - timedelta(days=30)).delete()
     SovSystem.objects.filter(owner__in=owners).exclude(solar_system_id__in=our_system_ids).delete()
     for owner in owners:
         owner.last_updated = timezone.now()
         owner.save(update_fields=['last_updated'])
+    # ADM alerts
+    SovSystem.objects.filter(solar_system_id__in=our_system_ids, adm__gte=4.5, adm_alert_sent=True).update(adm_alert_sent=False)
+    adm_webhook = SovConfiguration.get_adm_webhook()
+    if adm_webhook:
+        low = [s for s in updated_systems if s.adm < 4.5 and not s.adm_alert_sent]
+        if low:
+            _send_adm_alert(low, adm_webhook)
+            SovSystem.objects.filter(pk__in=[s.pk for s in low]).update(adm_alert_sent=True)
 
 
 @shared_task
@@ -328,28 +406,51 @@ def update_owner_sov_upgrades(owner_pk):
             }
         )
         system.hub_reagents.all().delete()
+        reagent_alerts = []
         for r in hub_reagent_data.get(sys_id, []):
+            bph = r.get('burning_per_hour', 0)
+            hours = round(r['amount'] / bph) if bph > 0 else None
             SovHubReagent.objects.create(
                 system=system,
                 type_id=r['type_id'],
                 type_name=reagent_name_map.get(r['type_id'], str(r['type_id'])),
                 amount=r.get('amount', 0),
-                burning_per_hour=r.get('burning_per_hour', 0),
+                burning_per_hour=bph,
             )
+            if hours is not None and hours < 72:
+                reagent_alerts.append({'name': reagent_name_map.get(r['type_id'], str(r['type_id'])), 'hours': hours})
+        new_reagent_level = ''
+        if reagent_alerts:
+            new_reagent_level = 'critical' if any(r['hours'] < 24 for r in reagent_alerts) else 'warning'
+        reagent_webhook = SovConfiguration.get_reagent_webhook()
+        if reagent_webhook and new_reagent_level and new_reagent_level != system.reagent_alert_level:
+            _send_reagent_alert(system, new_reagent_level, reagent_alerts, reagent_webhook)
+        if new_reagent_level != system.reagent_alert_level:
+            system.reagent_alert_level = new_reagent_level
+            system.save(update_fields=['reagent_alert_level'])
+        old_upgrade_states = {u.type_id: u.power_state for u in system.upgrades.all()}
         system.upgrades.all().delete()
+        module_changes = []
         for u in detail.get('upgrades', []):
             type_id = u['type_id']
             raw_name = name_map.get(type_id, str(type_id))
             rift_name = _format_upgrade_for_rift(raw_name)
             parts = rift_name.rsplit(' ', 1)
             lvl = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
+            new_state = u.get('power_state', 'Unknown')
             SovUpgrade.objects.create(
                 system=system,
                 type_id=type_id,
                 type_name=rift_name,
                 level=lvl,
-                power_state=u.get('power_state', 'Unknown'),
+                power_state=new_state,
             )
+            if type_id in old_upgrade_states and old_upgrade_states[type_id] != new_state:
+                module_changes.append({'name': rift_name, 'old': old_upgrade_states[type_id], 'new': new_state})
+        if module_changes:
+            module_webhook = SovConfiguration.get_module_webhook()
+            if module_webhook:
+                _send_module_alert(system, module_changes, module_webhook)
 
 
 @shared_task
@@ -358,7 +459,7 @@ def check_campaigns():
     if not our_system_ids:
         return
     try:
-        campaigns_data = _esi_get('/sovereignty/campaigns/')
+        campaigns_data = _esi_get('/sovereignty/campaigns')
     except Exception as e:
         logger.error('Failed to fetch campaigns: %s', e)
         return
@@ -387,3 +488,5 @@ def check_campaigns():
             campaign.notified = True
             campaign.save(update_fields=['notified'])
     SovCampaign.objects.exclude(campaign_id__in=active_ids).delete()
+
+

@@ -1,14 +1,17 @@
 from collections import defaultdict
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
+from django.db.models import Min, Max
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
 from allianceauth.services.hooks import get_extension_logger
 from esi.decorators import token_required
 
-from .models import SovOwner, SovSystem, SovCampaign
+from .models import SovOwner, SovSystem, SovCampaign, AdmHistory
 
 logger = get_extension_logger(__name__)
 
@@ -92,6 +95,19 @@ def index(request):
                 'reagents': reagents,
             })
 
+    week_ago = timezone.now() - timedelta(days=7)
+    adm_stats = (
+        AdmHistory.objects
+        .filter(system__in=systems, recorded_at__gte=week_ago)
+        .values('system_id')
+        .annotate(adm_min=Min('adm'), adm_max=Max('adm'))
+    )
+    adm_stats_map = {r['system_id']: r for r in adm_stats}
+    adm_rows = sorted(
+        [{'system': s, 'stats': adm_stats_map.get(s.id)} for s in systems],
+        key=lambda r: r['system'].adm,
+    )
+
     return render(request, 'aa_sov_monitor/index.html', {
         'owners': owners,
         'systems': systems,
@@ -104,6 +120,7 @@ def index(request):
         'upgrade_levels': upgrade_levels,
         'pivot_rows': pivot_rows,
         'manager_rows': manager_rows,
+        'adm_rows': adm_rows,
     })
 
 

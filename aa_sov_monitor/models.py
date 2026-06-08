@@ -2,15 +2,30 @@ from django.db import models
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
 
 class SovConfiguration(models.Model):
-    discord_webhook_url = models.URLField(blank=True)
+    discord_webhook_url = models.URLField(blank=True, verbose_name='Webhook: Campaigns')
+    webhook_adm = models.URLField(blank=True, verbose_name='Webhook: ADM-Alerts')
+    webhook_reagent = models.URLField(blank=True, verbose_name='Webhook: Reagent-Alerts')
+    webhook_module = models.URLField(blank=True, verbose_name='Webhook: Modul-Alerts')
     class Meta:
         default_permissions = ()
     def __str__(self):
         return 'SOV Monitor Konfiguration'
     @classmethod
-    def get_webhook_url(cls):
+    def _get(cls, field):
         config = cls.objects.first()
-        return config.discord_webhook_url if config and config.discord_webhook_url else None
+        return getattr(config, field, None) or None if config else None
+    @classmethod
+    def get_webhook_url(cls):
+        return cls._get('discord_webhook_url')
+    @classmethod
+    def get_adm_webhook(cls):
+        return cls._get('webhook_adm')
+    @classmethod
+    def get_reagent_webhook(cls):
+        return cls._get('webhook_reagent')
+    @classmethod
+    def get_module_webhook(cls):
+        return cls._get('webhook_module')
 
 class SovOwner(models.Model):
     alliance = models.OneToOneField(EveAllianceInfo, on_delete=models.CASCADE, related_name='sov_owner')
@@ -33,10 +48,15 @@ class SovSystem(models.Model):
     constellation_name = models.CharField(max_length=100, blank=True)
     region_name = models.CharField(max_length=100, blank=True)
     adm = models.FloatField(default=0)
+    industrial_level = models.IntegerField(default=0)
+    military_level = models.IntegerField(default=0)
+    strategic_level = models.IntegerField(default=0)
     has_ihub = models.BooleanField(default=False)
     has_tcu = models.BooleanField(default=False)
     vulnerable_start = models.DateTimeField(null=True, blank=True)
     vulnerable_end = models.DateTimeField(null=True, blank=True)
+    adm_alert_sent = models.BooleanField(default=False)
+    reagent_alert_level = models.CharField(max_length=10, default='')
     class Meta:
         default_permissions = ()
     def __str__(self):
@@ -86,3 +106,16 @@ class SovHubReagent(models.Model):
     class Meta:
         default_permissions = ()
         unique_together = ('system', 'type_id')
+
+
+class AdmHistory(models.Model):
+    system = models.ForeignKey(SovSystem, on_delete=models.CASCADE, related_name='adm_history')
+    adm = models.FloatField()
+    industrial_level = models.IntegerField(default=0)
+    military_level = models.IntegerField(default=0)
+    strategic_level = models.IntegerField(default=0)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        indexes = [models.Index(fields=['system', 'recorded_at'])]
