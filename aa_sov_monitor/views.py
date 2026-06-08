@@ -35,11 +35,12 @@ def index(request):
     for s in systems:
         for u in s.upgrades.all():
             u.base_name = _base_name(u.type_name)
+            u._sys = s
             all_upgrades.append(u)
     all_upgrades.sort(key=lambda u: u.type_name)
 
     rift_lines = [
-        f'{u.system.solar_system_name} -> {u.type_name}'
+        f'{u._sys.solar_system_name} -> {u.type_name}'
         for u in all_upgrades
         if u.base_name in RIFT_ALLOWED
     ]
@@ -133,5 +134,5 @@ def rift_export(request):
     for system in systems:
         for upgrade in system.upgrades.all():
             if _base_name(upgrade.type_name) in RIFT_ALLOWED:
-                lines.append(f'{system.solar_system_name} <- {upgrade.type_name}')
+                lines.append(f'{system.solar_system_name} -> {upgrade.type_name}')
     return HttpResponse('\n'.join(lines), content_type='text/plain')

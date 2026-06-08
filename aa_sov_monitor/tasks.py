@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from allianceauth.services.hooks import get_extension_logger
+from esi.models import Token
 
 from .models import SovOwner, SovSystem, SovUpgrade, SovCampaign, SovConfiguration, SovHubResource, SovHubReagent
 
@@ -21,7 +22,7 @@ TYPE_IHUB = 32458
 
 def _get_user_agent():
     email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'unknown@example.com')
-    return f'aa-sov-monitor/0.1.0 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
+    return f'aa-sov-monitor/0.1.1 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
 
 
 def _esi_get(path):
@@ -217,7 +218,6 @@ def update_sov_upgrades():
 
 @shared_task(rate_limit='10/m')
 def update_owner_sov_upgrades(owner_pk):
-    from esi.models import Token
     try:
         owner = SovOwner.objects.select_related('alliance', 'character').get(pk=owner_pk)
     except SovOwner.DoesNotExist:

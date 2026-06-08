@@ -18,8 +18,9 @@ class SovOwnerAdmin(admin.ModelAdmin):
 
     @admin.action(description='Jetzt von ESI aktualisieren')
     def update_now(self, request, queryset):
-        from .tasks import update_sov_data
+        from .tasks import update_sov_data, update_sov_upgrades
         update_sov_data.delay()
+        update_sov_upgrades.delay()
         self.message_user(request, 'SOV Update angestoßen.')
 
 
