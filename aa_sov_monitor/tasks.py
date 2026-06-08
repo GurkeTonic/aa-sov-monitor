@@ -22,7 +22,32 @@ TYPE_IHUB = 32458
 
 def _get_user_agent():
     email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'unknown@example.com')
-    return f'aa-sov-monitor/0.1.1 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
+    return f'aa-sov-monitor/0.1.2 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
+
+
+def _handle_esi_response(resp):
+    remain = int(resp.headers.get('X-ESI-Error-Limit-Remain', 100))
+    if remain < 10:
+        logger.warning(
+            'ESI error limit critical: %d remaining, resets in %ss',
+            remain, resp.headers.get('X-ESI-Error-Limit-Reset', '?'),
+        )
+    if resp.status_code == 429:
+        logger.warning('ESI rate limited (429), retry after %ss', resp.headers.get('Retry-After', '?'))
+    resp.raise_for_status()
+
+
+def _cache_with_expires(cache_key, data, resp_headers):
+    expires = resp_headers.get('Expires')
+    if expires:
+        try:
+            exp_dt = parsedate_to_datetime(expires)
+            ttl = max(60, int(exp_dt.timestamp() - timezone.now().timestamp()))
+            cache.set(cache_key, data, timeout=ttl)
+            return
+        except Exception:
+            pass
+    cache.set(cache_key, data, timeout=300)
 
 
 def _esi_get(path):
@@ -30,35 +55,66 @@ def _esi_get(path):
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
-
     headers = {**ESI_HEADERS, 'User-Agent': _get_user_agent()}
     resp = requests.get(f'{ESI_BASE}{path}', headers=headers, timeout=30)
-    resp.raise_for_status()
+    _handle_esi_response(resp)
     data = resp.json()
-
-    expires = resp.headers.get('Expires')
-    if expires:
-        try:
-            exp_dt = parsedate_to_datetime(expires)
-            ttl = max(60, int(exp_dt.timestamp() - timezone.now().timestamp()))
-            cache.set(cache_key, data, timeout=ttl)
-        except Exception:
-            cache.set(cache_key, data, timeout=300)
-    else:
-        cache.set(cache_key, data, timeout=300)
-
+    _cache_with_expires(cache_key, data, resp.headers)
     return data
 
 
 def _esi_get_auth(path, token):
+    cache_key = f'esi_sov_auth_{token.character_id}_{path}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     headers = {
         **ESI_HEADERS,
         'Authorization': f'Bearer {token.valid_access_token()}',
         'User-Agent': _get_user_agent(),
     }
     resp = requests.get(f'{ESI_BASE}{path}', headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    _handle_esi_response(resp)
+    data = resp.json()
+    _cache_with_expires(cache_key, data, resp.headers)
+    return data
+
+
+def _esi_get_auth_pages(path, token):
+    results = []
+    page = 1
+    while True:
+        cache_key = f'esi_sov_auth_{token.character_id}_{path}_p{page}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            data, total_pages = cached
+        else:
+            headers = {
+                **ESI_HEADERS,
+                'Authorization': f'Bearer {token.valid_access_token()}',
+                'User-Agent': _get_user_agent(),
+            }
+            resp = requests.get(
+                f'{ESI_BASE}{path}', headers=headers, params={'page': page}, timeout=30
+            )
+            _handle_esi_response(resp)
+            data = resp.json()
+            total_pages = int(resp.headers.get('X-Pages', 1))
+            expires = resp.headers.get('Expires')
+            ttl = 300
+            if expires:
+                try:
+                    exp_dt = parsedate_to_datetime(expires)
+                    ttl = max(60, int(exp_dt.timestamp() - timezone.now().timestamp()))
+                except Exception:
+                    pass
+            cache.set(cache_key, (data, total_pages), timeout=ttl)
+        if isinstance(data, list):
+            results.extend(data)
+        if page >= total_pages:
+            break
+        page += 1
+    return results
 
 
 def _resolve_names(ids):
@@ -67,7 +123,7 @@ def _resolve_names(ids):
     try:
         headers = {**ESI_HEADERS, 'User-Agent': _get_user_agent()}
         resp = requests.post(f'{ESI_BASE}/universe/names/', json=list(ids), headers=headers, timeout=30)
-        resp.raise_for_status()
+        _handle_esi_response(resp)
         return {item['id']: item['name'] for item in resp.json()}
     except Exception as e:
         logger.warning('Name resolution failed: %s', e)
@@ -228,8 +284,7 @@ def update_owner_sov_upgrades(owner_pk):
         return
     corp_id = owner.character.corporation_id
     try:
-        data = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
-        hubs = data.get('sovereignty_hubs', [])
+        hubs = _esi_get_auth_pages(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
     except Exception as e:
         logger.error('Failed to fetch hub list for %s: %s', owner, e)
         return
