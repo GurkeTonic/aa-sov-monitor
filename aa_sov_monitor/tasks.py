@@ -1,19 +1,77 @@
-import logging
+from email.utils import parsedate_to_datetime
+
 import requests
 from celery import shared_task
+from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+from allianceauth.services.hooks import get_extension_logger
+
 from .models import SovOwner, SovSystem, SovUpgrade, SovCampaign, SovConfiguration, SovHubResource, SovHubReagent
 
-logger = logging.getLogger(__name__)
-ESI_BASE = 'https://esi.evetech.net/latest'
+logger = get_extension_logger(__name__)
+
+ESI_BASE = 'https://esi.evetech.net'
+ESI_HEADERS = {'X-Compatibility-Date': '2026-05-19'}
 TYPE_TCU = 32226
 TYPE_IHUB = 32458
 
+
+def _get_user_agent():
+    email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'unknown@example.com')
+    return f'aa-sov-monitor/0.1.0 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
+
+
 def _esi_get(path):
-    resp = requests.get(f'{ESI_BASE}{path}', timeout=30)
+    cache_key = f'esi_sov_pub_{path}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    headers = {**ESI_HEADERS, 'User-Agent': _get_user_agent()}
+    resp = requests.get(f'{ESI_BASE}{path}', headers=headers, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    expires = resp.headers.get('Expires')
+    if expires:
+        try:
+            exp_dt = parsedate_to_datetime(expires)
+            ttl = max(60, int(exp_dt.timestamp() - timezone.now().timestamp()))
+            cache.set(cache_key, data, timeout=ttl)
+        except Exception:
+            cache.set(cache_key, data, timeout=300)
+    else:
+        cache.set(cache_key, data, timeout=300)
+
+    return data
+
+
+def _esi_get_auth(path, token):
+    headers = {
+        **ESI_HEADERS,
+        'Authorization': f'Bearer {token.valid_access_token()}',
+        'User-Agent': _get_user_agent(),
+    }
+    resp = requests.get(f'{ESI_BASE}{path}', headers=headers, timeout=30)
     resp.raise_for_status()
     return resp.json()
+
+
+def _resolve_names(ids):
+    if not ids:
+        return {}
+    try:
+        headers = {**ESI_HEADERS, 'User-Agent': _get_user_agent()}
+        resp = requests.post(f'{ESI_BASE}/universe/names/', json=list(ids), headers=headers, timeout=30)
+        resp.raise_for_status()
+        return {item['id']: item['name'] for item in resp.json()}
+    except Exception as e:
+        logger.warning('Name resolution failed: %s', e)
+        return {}
+
 
 def _get_system_details(system_ids):
     result = {}
@@ -61,16 +119,6 @@ def _get_system_details(system_ids):
         )
     return result
 
-def _resolve_names(ids):
-    if not ids:
-        return {}
-    try:
-        resp = requests.post(f'{ESI_BASE}/universe/names/', json=list(ids), timeout=30)
-        resp.raise_for_status()
-        return {item['id']: item['name'] for item in resp.json()}
-    except Exception as e:
-        logger.warning('Name resolution failed: %s', e)
-        return {}
 
 def _send_campaign_alert(campaign):
     webhook_url = SovConfiguration.get_webhook_url()
@@ -96,6 +144,15 @@ def _send_campaign_alert(campaign):
         requests.post(webhook_url, json={'content': '@everyone', 'embeds': [embed]}, timeout=10)
     except Exception as e:
         logger.error('Discord webhook failed: %s', e)
+
+
+def _format_upgrade_for_rift(name):
+    name = name.replace('Sovereignty Hub Upgrade: ', '')
+    for roman, num in [(' III', ' 3'), (' II', ' 2'), (' I', ' 1')]:
+        if name.endswith(roman):
+            return name[:-len(roman)] + num
+    return name
+
 
 @shared_task
 def update_sov_data():
@@ -152,104 +209,93 @@ def update_sov_data():
         owner.save(update_fields=['last_updated'])
 
 
-ESI_HEADERS = {'X-Compatibility-Date': '2026-05-19'}
-
-def _esi_get_auth(path, token):
-    headers = {**ESI_HEADERS, 'Authorization': f'Bearer {token.valid_access_token()}'}
-    resp = requests.get(f'https://esi.evetech.net{path}', headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
-
-def _format_upgrade_for_rift(name):
-    name = name.replace('Sovereignty Hub Upgrade: ', '')
-    for roman, num in [(' III', ' 3'), (' II', ' 2'), (' I', ' 1')]:
-        if name.endswith(roman):
-            return name[:-len(roman)] + num
-    return name
-
 @shared_task
 def update_sov_upgrades():
-    from esi.models import Token
-    owners = list(SovOwner.objects.select_related('alliance', 'character').all())
-    if not owners:
-        return
-    for owner in owners:
-        token = Token.get_token(owner.character.character_id, ['esi-structures.read_corporation.v1'])
-        if not token:
-            logger.warning('No token for %s', owner)
-            continue
-        corp_id = owner.character.corporation_id
-        try:
-            data = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
-            hubs = data.get('sovereignty_hubs', [])
-        except Exception as e:
-            logger.error('Failed to fetch hub list for %s: %s', owner, e)
-            continue
-        # Collect all type_ids and reagent data in one loop
-        all_type_ids = set()
-        all_reagent_type_ids = set()
-        hub_reagent_data = {}
-        hub_details = {}
-        for hub in hubs:
-            try:
-                detail = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs/{hub["id"]}', token)
-                hub_details[hub['id']] = detail
-                for u in detail.get('upgrades', []):
-                    all_type_ids.add(u['type_id'])
-                for r in detail.get('reagent_bay', {}).get('reagents', []):
-                    all_reagent_type_ids.add(r['type_id'])
-                    hub_reagent_data.setdefault(hub['solar_system_id'], []).append(r)
-            except Exception as e:
-                logger.error('Failed to fetch hub detail %s: %s', hub["id"], e)
-        reagent_name_map = _resolve_names(all_reagent_type_ids)
-        # Resolve type names
-        name_map = _resolve_names(all_type_ids)
-        # Store upgrades
-        system_id_map = {h['solar_system_id']: h['id'] for h in hubs}
-        for sys_id, hub_id in system_id_map.items():
-            try:
-                system = SovSystem.objects.get(solar_system_id=sys_id)
-            except SovSystem.DoesNotExist:
-                continue
-            detail = hub_details.get(hub_id, {})
-            # Resources
-            res = detail.get('resources', {})
-            pw = res.get('power', {})
-            wf = res.get('workforce', {})
-            SovHubResource.objects.update_or_create(
-                system=system,
-                defaults={
-                    'power_available': pw.get('available', 0),
-                    'power_allocated': pw.get('allocated', 0),
-                    'workforce_available': wf.get('available', 0),
-                    'workforce_allocated': wf.get('allocated', 0),
-                }
-            )
-            # Reagents
-            system.hub_reagents.all().delete()
-            for r in hub_reagent_data.get(sys_id, []):
-                SovHubReagent.objects.create(
-                    system=system,
-                    type_id=r['type_id'],
-                    type_name=reagent_name_map.get(r['type_id'], str(r['type_id'])),
-                    amount=r.get('amount', 0),
-                    burning_per_hour=r.get('burning_per_hour', 0),
-                )
-            system.upgrades.all().delete()
-            for u in detail.get('upgrades', []):
+    for pk in SovOwner.objects.values_list('pk', flat=True):
+        update_owner_sov_upgrades.delay(pk)
 
-                type_id = u['type_id']
-                raw_name = name_map.get(type_id, str(type_id))
-                rift_name = _format_upgrade_for_rift(raw_name)
-                parts = rift_name.rsplit(' ', 1)
-                lvl = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
-                SovUpgrade.objects.create(
-                    system=system,
-                    type_id=type_id,
-                    type_name=rift_name,
-                    level=lvl,
-                    power_state=u.get('power_state', 'Unknown'),
-                )
+
+@shared_task(rate_limit='10/m')
+def update_owner_sov_upgrades(owner_pk):
+    from esi.models import Token
+    try:
+        owner = SovOwner.objects.select_related('alliance', 'character').get(pk=owner_pk)
+    except SovOwner.DoesNotExist:
+        return
+    token = Token.get_token(owner.character.character_id, ['esi-structures.read_corporation.v1'])
+    if not token:
+        logger.warning('No token for %s', owner)
+        return
+    corp_id = owner.character.corporation_id
+    try:
+        data = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs', token)
+        hubs = data.get('sovereignty_hubs', [])
+    except Exception as e:
+        logger.error('Failed to fetch hub list for %s: %s', owner, e)
+        return
+
+    all_type_ids = set()
+    all_reagent_type_ids = set()
+    hub_reagent_data = {}
+    hub_details = {}
+    for hub in hubs:
+        try:
+            detail = _esi_get_auth(f'/corporations/{corp_id}/structures/sovereignty-hubs/{hub["id"]}', token)
+            hub_details[hub['id']] = detail
+            for u in detail.get('upgrades', []):
+                all_type_ids.add(u['type_id'])
+            for r in detail.get('reagent_bay', {}).get('reagents', []):
+                all_reagent_type_ids.add(r['type_id'])
+                hub_reagent_data.setdefault(hub['solar_system_id'], []).append(r)
+        except Exception as e:
+            logger.error('Failed to fetch hub detail %s: %s', hub['id'], e)
+
+    name_map = _resolve_names(all_type_ids)
+    reagent_name_map = _resolve_names(all_reagent_type_ids)
+    system_id_map = {h['solar_system_id']: h['id'] for h in hubs}
+
+    for sys_id, hub_id in system_id_map.items():
+        try:
+            system = SovSystem.objects.get(solar_system_id=sys_id)
+        except SovSystem.DoesNotExist:
+            continue
+        detail = hub_details.get(hub_id, {})
+        res = detail.get('resources', {})
+        pw = res.get('power', {})
+        wf = res.get('workforce', {})
+        SovHubResource.objects.update_or_create(
+            system=system,
+            defaults={
+                'power_available': pw.get('available', 0),
+                'power_allocated': pw.get('allocated', 0),
+                'workforce_available': wf.get('available', 0),
+                'workforce_allocated': wf.get('allocated', 0),
+            }
+        )
+        system.hub_reagents.all().delete()
+        for r in hub_reagent_data.get(sys_id, []):
+            SovHubReagent.objects.create(
+                system=system,
+                type_id=r['type_id'],
+                type_name=reagent_name_map.get(r['type_id'], str(r['type_id'])),
+                amount=r.get('amount', 0),
+                burning_per_hour=r.get('burning_per_hour', 0),
+            )
+        system.upgrades.all().delete()
+        for u in detail.get('upgrades', []):
+            type_id = u['type_id']
+            raw_name = name_map.get(type_id, str(type_id))
+            rift_name = _format_upgrade_for_rift(raw_name)
+            parts = rift_name.rsplit(' ', 1)
+            lvl = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
+            SovUpgrade.objects.create(
+                system=system,
+                type_id=type_id,
+                type_name=rift_name,
+                level=lvl,
+                power_state=u.get('power_state', 'Unknown'),
+            )
+
 
 @shared_task
 def check_campaigns():
@@ -281,7 +327,7 @@ def check_campaigns():
                 'start_time': parse_datetime(c['start_time']),
             }
         )
-        if created and not campaign.notified:
+        if created:
             _send_campaign_alert(campaign)
             campaign.notified = True
             campaign.save(update_fields=['notified'])

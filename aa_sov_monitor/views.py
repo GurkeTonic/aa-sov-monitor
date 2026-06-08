@@ -1,66 +1,74 @@
-import logging
 from collections import defaultdict
+
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
+from allianceauth.services.hooks import get_extension_logger
 from esi.decorators import token_required
-from .models import SovOwner, SovSystem, SovCampaign, SovUpgrade, SovHubResource, SovHubReagent
 
-logger = logging.getLogger(__name__)
+from .models import SovOwner, SovSystem, SovCampaign
+
+logger = get_extension_logger(__name__)
+
+RIFT_ALLOWED = {'Major Threat Detection Array', 'Minor Threat Detection Array', 'Exploration Detector'}
+
+
+def _base_name(type_name):
+    parts = type_name.rsplit(' ', 1)
+    return parts[0] if len(parts) == 2 and parts[1].isdigit() else type_name
+
 
 @permission_required('aa_sov_monitor.view_sov')
 def index(request):
     owners = SovOwner.objects.select_related('alliance').all()
-    systems = (
+    systems = list(
         SovSystem.objects
-        .select_related('owner__alliance')
-        .prefetch_related('upgrades')
+        .select_related('owner__alliance', 'hub_resource')
+        .prefetch_related('upgrades', 'hub_reagents')
         .order_by('region_name', 'constellation_name', 'solar_system_name')
     )
     campaigns = SovCampaign.objects.order_by('start_time')
-    RIFT_ALLOWED = {'Major Threat Detection Array', 'Minor Threat Detection Array', 'Exploration Detector'}
-    rift_lines = []
-    for system in systems:
-        for upgrade in system.upgrades.all():
-            parts = upgrade.type_name.rsplit(' ', 1)
-            base = parts[0] if len(parts) == 2 and parts[1].isdigit() else upgrade.type_name
-            if base in RIFT_ALLOWED:
-                rift_lines.append(f'{system.solar_system_name} -> {upgrade.type_name}')
 
-    all_upgrades = list(SovUpgrade.objects.select_related('system').order_by('type_name'))
-    for u in all_upgrades:
-        parts = u.type_name.rsplit(' ', 1)
-        u.base_name = parts[0] if len(parts) == 2 and parts[1].isdigit() else u.type_name
+    all_upgrades = []
+    for s in systems:
+        for u in s.upgrades.all():
+            u.base_name = _base_name(u.type_name)
+            all_upgrades.append(u)
+    all_upgrades.sort(key=lambda u: u.type_name)
 
-    all_base_names = set(u.base_name for u in all_upgrades)
+    rift_lines = [
+        f'{u.system.solar_system_name} -> {u.type_name}'
+        for u in all_upgrades
+        if u.base_name in RIFT_ALLOWED
+    ]
+
+    all_base_names = {u.base_name for u in all_upgrades}
     threat_types = [t for t in ['Minor Threat Detection Array', 'Major Threat Detection Array'] if t in all_base_names]
     prospecting = sorted(bn for bn in all_base_names if 'Prospecting Array' in bn)
     exploration = sorted(bn for bn in all_base_names if 'Exploration Detector' in bn)
     ordered_cols = threat_types + prospecting + exploration
-
     allowed = set(ordered_cols)
+
     system_upgrade_map = defaultdict(dict)
     for u in all_upgrades:
         if u.base_name in allowed:
             system_upgrade_map[u.system_id][u.base_name] = (u.level, u.power_state)
 
-    pivot_systems = list(SovSystem.objects.select_related('owner__alliance').order_by('region_name', 'constellation_name', 'solar_system_name'))
-    upgrade_constellations = sorted(set(s.constellation_name for s in pivot_systems if s.constellation_name))
-    upgrade_levels = sorted(set(u.level for u in all_upgrades if u.base_name in allowed))
-
+    upgrade_constellations = sorted({s.constellation_name for s in systems if s.constellation_name})
+    upgrade_levels = sorted({u.level for u in all_upgrades if u.base_name in allowed})
     pivot_rows = [
         {
             'system': s,
             'cells': [(col, system_upgrade_map[s.id].get(col, (None, None))) for col in ordered_cols],
         }
-        for s in pivot_systems
+        for s in systems
     ]
 
     manager_rows = []
     if request.user.has_perm('aa_sov_monitor.view_manager'):
-        for s in SovSystem.objects.select_related('owner__alliance').prefetch_related('hub_reagents').order_by('region_name', 'constellation_name', 'solar_system_name'):
+        for s in systems:
             try:
                 hr = s.hub_resource
                 power_pct = int(hr.power_allocated / hr.power_available * 100) if hr.power_available else 0
@@ -82,6 +90,7 @@ def index(request):
                 'wf_pct': wf_pct,
                 'reagents': reagents,
             })
+
     return render(request, 'aa_sov_monitor/index.html', {
         'owners': owners,
         'systems': systems,
@@ -95,6 +104,7 @@ def index(request):
         'pivot_rows': pivot_rows,
         'manager_rows': manager_rows,
     })
+
 
 @permission_required('aa_sov_monitor.manage_sov')
 @token_required(scopes=['esi-structures.read_corporation.v1'])
@@ -115,11 +125,13 @@ def add_owner(request, token):
     messages.success(request, f'{alliance.alliance_name} zum SOV Monitor hinzugefügt.')
     return redirect('aa_sov_monitor:index')
 
+
 @permission_required('aa_sov_monitor.view_sov')
 def rift_export(request):
     systems = SovSystem.objects.prefetch_related('upgrades').filter(has_ihub=True)
     lines = []
     for system in systems:
         for upgrade in system.upgrades.all():
-            lines.append(f'{system.solar_system_name} <- {upgrade.type_name}')
+            if _base_name(upgrade.type_name) in RIFT_ALLOWED:
+                lines.append(f'{system.solar_system_name} <- {upgrade.type_name}')
     return HttpResponse('\n'.join(lines), content_type='text/plain')
