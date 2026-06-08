@@ -20,10 +20,14 @@ def index(request):
         .order_by('region_name', 'constellation_name', 'solar_system_name')
     )
     campaigns = SovCampaign.objects.order_by('start_time')
+    RIFT_ALLOWED = {'Major Threat Detection Array', 'Minor Threat Detection Array', 'Exploration Detector'}
     rift_lines = []
     for system in systems:
         for upgrade in system.upgrades.all():
-            rift_lines.append(f'{system.solar_system_name} <- {upgrade.type_name}')
+            parts = upgrade.type_name.rsplit(' ', 1)
+            base = parts[0] if len(parts) == 2 and parts[1].isdigit() else upgrade.type_name
+            if base in RIFT_ALLOWED:
+                rift_lines.append(f'{system.solar_system_name} -> {upgrade.type_name}')
 
     all_upgrades = list(SovUpgrade.objects.select_related('system').order_by('type_name'))
     for u in all_upgrades:
