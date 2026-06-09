@@ -1,175 +1,136 @@
-# AA SOV Monitor<a name="aa-sov-monitor"></a>
+# AA SOV Monitor
 
-[![Release](https://img.shields.io/github/v/release/GurkeTonic/aa-sov-monitor?label=release)](https://github.com/GurkeTonic/aa-sov-monitor/releases)
-[![License](https://img.shields.io/badge/license-GPL--3.0-green)](https://github.com/GurkeTonic/aa-sov-monitor/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/django-4.2%2B-green)](https://www.djangoproject.com/)
-[![Alliance Auth Compatibility](https://img.shields.io/badge/Alliance_Auth-v5-brightgreen)](https://gitlab.com/allianceauth/allianceauth)
+[![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
+[![Alliance Auth](https://img.shields.io/badge/alliance--auth-5.1+-orange)](https://gitlab.com/allianceauth/allianceauth)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green)](LICENSE)
 
-An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin for EVE Online sovereignty monitoring.
-Track ADM levels, IHUB upgrade states, active SOV campaigns, reagent fuel health, and module states — all in one place.
+An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin to monitor EVE Online sovereignty — ADM levels, IHUB upgrade states, active SOV campaigns, reagent fuel health, and module states.
 
-______________________________________________________________________
+---
 
-- [AA SOV Monitor](#aa-sov-monitor)
-  - [Features](#features)
-  - [Installation](#installation)
-    - [Step 1 - Install the Package](#step-1)
-    - [Step 2 - Configure Alliance Auth](#step-2)
-    - [Step 3 - Run Migrations and Collect Static Files](#step-3)
-    - [Step 4 - Restart Services](#step-4)
-  - [Configuration](#configuration)
-    - [Permissions](#permissions)
-    - [Discord Webhooks](#discord-webhooks)
-    - [Celery Beat Tasks](#celery-beat-tasks)
-  - [Usage](#usage)
-    - [Adding an Alliance](#adding-an-alliance)
-    - [Tabs](#tabs)
-  - [ESI Endpoints Used](#esi-endpoints-used)
-  - [Contributing](#contributing)
+## Features
 
-______________________________________________________________________
+- **ADM Overview** — All sovereignty systems sorted by ADM ascending with color-coded badges (red below 4.5), development indices (industrial, military, strategic), IHUB presence, vulnerability windows, and 7-day min/max history
+- **ADM History Tracking** — ADM values recorded every 15 minutes, stored for 30 days
+- **Upgrades Pivot Table** — Threat Detection Arrays, Prospecting Arrays, and Exploration Detectors per system with level and power state indicators
+- **Campaign Alerts** — Active SOV campaigns in real-time with Discord notifications on new attacks
+- **RIFT Export** — One-click copy of IHUB upgrade data in RIFT-compatible format
+- **Manager Tab** *(restricted)* — Hub power and workforce usage bars, reagent fuel countdown per system
+- **Discord Alerts** — Separate webhooks for SOV attacks, ADM warnings, reagent fuel alerts, and module state changes
+- Celery Beat tasks register automatically on startup — no `local.py` configuration required
 
-## Features<a name="features"></a>
+---
 
-- **ADM Overview** — All sovereignty systems sorted by ADM (lowest first) with color-coded badges (red below 4.5), development indices (industrial, military, strategic), IHUB presence, vulnerability windows, and 7-day ADM history (min/max)
-- **ADM Activity Tracking** — ADM values are recorded every 15 minutes and stored for 30 days, giving you a historical view of ADM development per system
-- **Upgrades Pivot Table** — At-a-glance view of Threat Detection Arrays, Prospecting Arrays, and Exploration Detectors per system with level indicators (green = Online, orange = Anchored, red = Offline)
-- **Campaign Alerts** — Active SOV campaigns listed in real-time with Discord notifications on new attacks
-- **RIFT Export** — Copy IHUB upgrade data to clipboard in RIFT-compatible format with one click
-- **Manager Tab** — Hub power and workforce usage bars with reagent fuel countdown per system *(restricted permission)*
-- **Discord Alerts** — Separate configurable webhooks for ADM warnings, reagent fuel alerts, and module state changes
+## Requirements
 
-______________________________________________________________________
+| Requirement | Version |
+|---|---|
+| Alliance Auth | >= 5.1.0 |
+| Python | >= 3.10 |
 
-## Installation<a name="installation"></a>
+### ESI Scope
 
-> [!NOTE]
-> AA SOV Monitor requires Alliance Auth v5.1 or higher.
-> Please make sure to update your Alliance Auth before installing this app.
+| Scope | Used for |
+|---|---|
+| `esi-structures.read_corporation.v1` | IHUB upgrade states, hub resources and reagents |
 
-### Step 1 - Install the Package<a name="step-1"></a>
+> The character used to authorize an alliance must be a director or have the **Starbase Fuel Technician** role in the holding corporation.
 
-Make sure you're in the virtual environment (venv) of your Alliance Auth installation, then install the package:
+---
 
-```shell
-pip install aa-sov-monitor
-```
+## Installation
 
-Or directly from GitHub:
+**Step 1 — Install the package**
 
-```shell
-pip install git+https://github.com/GurkeTonic/aa-sov-monitor.git
-```
+    pip install git+https://github.com/GurkeTonic/aa-sov-monitor.git
 
-### Step 2 - Configure Alliance Auth<a name="step-2"></a>
+**Step 2 — Add to `INSTALLED_APPS` in `local.py`**
 
-Add the app to your `INSTALLED_APPS` in `local.py`:
+    INSTALLED_APPS += [
+        'aa_sov_monitor',
+    ]
 
-```python
-INSTALLED_APPS += [
-    "aa_sov_monitor",
-]
-```
+**Step 3 — Run migrations and collect static**
 
-### Step 3 - Run Migrations and Collect Static Files<a name="step-3"></a>
+    python manage.py migrate
+    python manage.py collectstatic
 
-```shell
-python manage.py migrate
-python manage.py collectstatic --noinput
-```
+**Step 4 — Restart services**
 
-### Step 4 - Restart Services<a name="step-4"></a>
+    sudo supervisorctl restart myauth:
 
-```shell
-supervisorctl restart myauth:
-```
+---
 
-______________________________________________________________________
+## Setup
 
-## Configuration<a name="configuration"></a>
+1. Open **SOV Monitor** in the Alliance Auth navigation menu
+2. Click **+ Add Alliance** and authenticate with a character that has the **Starbase Fuel Technician** or director role in the holding corporation
+3. The first sync runs automatically within 15 minutes, or trigger it manually via **Django Admin → Sov Owners → Actions → Update from ESI now**
 
-### Permissions<a name="permissions"></a>
+---
 
-Assign permissions to your Auth groups in **Django Admin → Authentication → Groups**:
+## Discord Webhooks (optional)
+
+1. Create a Webhook in your Discord server (Channel Settings → Integrations → Webhooks)
+2. Go to **Django Admin → AA SOV Monitor → Sov Configurations → Add**
+3. Enter the Webhook URL(s) and save
+
+| Webhook | Trigger | Behaviour |
+|---|---|---|
+| **Campaigns** | New SOV attack detected | Immediate @everyone alert with system, type, and start time |
+| **ADM Alerts** | System ADM drops below 4.5 | All affected systems in one post; resets when ADM recovers |
+| **Reagent Alerts** | Reagent fuel below 72 h (Warning) or 24 h (Critical) | Re-alerts on escalation Warning → Critical |
+| **Module Alerts** | IHUB upgrade changes power state | Shows old state → new state |
+
+All webhooks are optional and independent — alerts are only sent if a URL is configured.
+
+---
+
+## Permissions
 
 | Permission | Description |
-| :--- | :--- |
-| `view_sov` | Access to ADM overview, Upgrades, Campaigns, and RIFT Export tabs |
+|---|---|
+| `view_sov` | Access to ADM, Upgrades, Campaigns, and RIFT Export tabs |
 | `manage_sov` | Add or remove alliances from tracking |
 | `view_manager` | Access to the Manager tab (power, workforce, reagents) |
 
-### Discord Webhooks<a name="discord-webhooks"></a>
+Assign permissions via **Django Admin → Auth → Groups**.
 
-Four independent webhooks can be configured in **Django Admin → AA SOV Monitor → Sov Configurations**:
+---
 
-| Webhook | Trigger | Behaviour |
-| :--- | :--- | :--- |
-| **Campaigns** | New SOV attack detected | Immediate alert on new campaign |
-| **ADM Alerts** | System ADM drops below 4.5 | All affected systems bundled in one post; resets automatically when ADM recovers above 4.5 |
-| **Reagent Alerts** | Reagent fuel below 72h (Warning) or 24h (Critical) | Re-alerts on escalation from Warning → Critical |
-| **Module Alerts** | IHUB upgrade changes power state | Shows old state → new state with Online/Offline indicator |
+## Tabs
 
-> [!NOTE]
-> All webhooks are optional. Alerts are only sent if a webhook URL is configured.
+**ADM** — Sovereignty systems sorted by ADM ascending. Red badge below 4.5, green at 4.5 and above. Shows development indices, IHUB status, vulnerability windows, and 7-day min/max ADM history.
 
-### Celery Beat Tasks<a name="celery-beat-tasks"></a>
+**Upgrades** — Pivot table of IHUB upgrades per system. Filter by constellation, upgrade type, and level. Green = Online, orange = Anchored/Pending, red = Offline.
 
-Tasks are registered automatically on startup — no manual configuration needed:
+**Campaigns** — Live list of active SOV campaigns targeting your systems.
 
-| Task | Schedule | Description |
-| :--- | :--- | :--- |
-| `update_sov_data` | Every 15 minutes | Fetches sovereignty data and ADM values from ESI |
-| `check_campaigns` | Every 2 minutes | Checks for active SOV campaigns |
-| `update_sov_upgrades` | Every 30 minutes | Fetches IHUB upgrade states and reagent levels |
+**RIFT Export** — IHUB upgrade data in RIFT format. Copy to clipboard and paste into the RIFT desktop app.
 
-______________________________________________________________________
+**Manager** *(restricted)* — Power and workforce usage as progress bars. Reagent bay countdown in hours per reagent type.
 
-## Usage<a name="usage"></a>
+---
 
-### Adding an Alliance<a name="adding-an-alliance"></a>
+## ESI Endpoints
 
-1. Click **+ Add Alliance** in the top navbar (requires `manage_sov` permission)
-2. Authorize the ESI token for a character in the alliance's holding corporation
-
-> [!IMPORTANT]
-> The character must be a director or have the **Starbase Fuel Technician** role in their corporation for upgrade and reagent data to sync correctly.
-
-3. Wait for the next scheduled sync or trigger a manual update from **Django Admin → Sov Owners → Actions → Update from ESI now**
-
-### Tabs<a name="tabs"></a>
-
-**ADM** — Sovereignty map sorted by ADM ascending. Badges are red below 4.5, green at 4.5 and above. Shows development indices (industrial, military, strategic levels), IHUB status, vulnerability windows, and 7-day min/max ADM history per system.
-
-**Upgrades** — Pivot table showing which IHUB upgrades are installed per system and at what level. Filter by constellation, upgrade type, and level. Badge colors indicate power state: green = Online, orange = Anchored, red = Offline.
-
-**Campaigns** — Live list of active sovereignty campaigns targeting your systems.
-
-**RIFT Export** — Generates a text block in RIFT format for all IHUB upgrades. Copy to clipboard and paste directly into the RIFT desktop app.
-
-**Manager** *(restricted)* — Per-hub power and workforce usage shown as progress bars. Reagent bay countdown shows estimated hours until empty per reagent type.
-
-______________________________________________________________________
-
-## ESI Endpoints Used<a name="esi-endpoints-used"></a>
-
-| Endpoint | Auth Required |
-| :--- | :---: |
+| Endpoint | Auth |
+|---|:---:|
 | `GET /sovereignty/systems` | No |
 | `GET /sovereignty/campaigns` | No |
-| `GET /corporations/{id}/structures/sovereignty-hubs` | Yes |
-| `GET /corporations/{id}/structures/sovereignty-hubs/{hub_id}` | Yes |
+| `GET /corporations/{corporation_id}/structures/sovereignty-hubs` | Yes |
+| `GET /corporations/{corporation_id}/structures/sovereignty-hubs/{hub_id}` | Yes |
 
-Required ESI scope: `esi-structures.read_corporation.v1`
+System and constellation names are resolved via `POST /universe/names` as a fallback when [django-eveonline-sde](https://github.com/nicoscha/django-eveonline-sde) is not installed.
 
-> Uses `X-Compatibility-Date` header for ESI versioning per CCP developer guidelines.
+---
 
-______________________________________________________________________
+## Contributing
 
-## Contributing<a name="contributing"></a>
+Pull requests are welcome. For major changes please open an issue first.
 
-Pull requests are welcome. Please open an issue first to discuss what you would like to change.
+---
 
 ## License
 
-GPL-3.0-or-later
+[GPL-3.0](LICENSE)
