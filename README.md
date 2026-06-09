@@ -34,7 +34,7 @@ An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin to monit
 |---|---|
 | `esi-structures.read_corporation.v1` | IHUB upgrade states, hub resources and reagents |
 
-> The character used to authorize an alliance must be a director or have the **Starbase Fuel Technician** role in the holding corporation.
+> The character used to authorize an alliance must have the **Station Manager** role in the holding corporation.
 
 ---
 
@@ -44,18 +44,27 @@ An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin to monit
 
     pip install git+https://github.com/GurkeTonic/aa-sov-monitor.git
 
-**Step 2 — Add to `INSTALLED_APPS` in `local.py`**
+**Step 2 — Install EVE SDE (if not already present)**
+
+    pip install django-eveonline-sde
+
+**Step 3 — Add to `INSTALLED_APPS` in `local.py`**
 
     INSTALLED_APPS += [
         'aa_sov_monitor',
+        'eve_sde',
     ]
 
-**Step 3 — Run migrations and collect static**
+**Step 4 — Run migrations and collect static**
 
     python manage.py migrate
     python manage.py collectstatic
 
-**Step 4 — Restart services**
+**Step 5 — Load SDE data**
+
+    python manage.py import_sde
+
+**Step 6 — Restart services**
 
     sudo supervisorctl restart myauth:
 
@@ -109,19 +118,6 @@ Assign permissions via **Django Admin → Auth → Groups**.
 **RIFT Export** — IHUB upgrade data in RIFT format. Copy to clipboard and paste into the RIFT desktop app.
 
 **Manager** *(restricted)* — Power and workforce usage as progress bars. Reagent bay countdown in hours per reagent type.
-
----
-
-## ESI Endpoints
-
-| Endpoint | Auth |
-|---|:---:|
-| `GET /sovereignty/systems` | No |
-| `GET /sovereignty/campaigns` | No |
-| `GET /corporations/{corporation_id}/structures/sovereignty-hubs` | Yes |
-| `GET /corporations/{corporation_id}/structures/sovereignty-hubs/{hub_id}` | Yes |
-
-System and constellation names are resolved via `POST /universe/names` as a fallback when [django-eveonline-sde](https://github.com/nicoscha/django-eveonline-sde) is not installed.
 
 ---
 
