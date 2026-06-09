@@ -130,17 +130,17 @@ def add_owner(request, token):
     try:
         character = EveCharacter.objects.get(character_id=token.character_id)
     except EveCharacter.DoesNotExist:
-        messages.error(request, 'Charakter nicht in Auth gefunden.')
+        messages.error(request, 'Character not found in Auth.')
         return redirect('aa_sov_monitor:index')
     if not character.alliance_id:
-        messages.error(request, 'Charakter ist in keiner Alliance.')
+        messages.error(request, 'Character is not in an alliance.')
         return redirect('aa_sov_monitor:index')
     try:
         alliance = EveAllianceInfo.objects.get(alliance_id=character.alliance_id)
     except EveAllianceInfo.DoesNotExist:
         alliance = EveAllianceInfo.objects.create_alliance(character.alliance_id)
     SovOwner.objects.update_or_create(alliance=alliance, defaults={'character': character})
-    messages.success(request, f'{alliance.alliance_name} zum SOV Monitor hinzugefügt.')
+    messages.success(request, f'{alliance.alliance_name} added to SOV Monitor.')
     return redirect('aa_sov_monitor:index')
 
 

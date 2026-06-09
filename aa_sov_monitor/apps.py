@@ -1,10 +1,11 @@
 from django.apps import AppConfig
+from aa_sov_monitor import __version__
 
 
 class AaSovMonitorConfig(AppConfig):
     name = 'aa_sov_monitor'
     label = 'aa_sov_monitor'
-    verbose_name = 'SOV Monitor'
+    verbose_name = f'SOV Monitor v{__version__}'
 
     def ready(self):
         from celery import current_app
@@ -22,4 +23,5 @@ class AaSovMonitorConfig(AppConfig):
         current_app.conf.beat_schedule['aa_sov_monitor_campaigns'] = {
             'task': 'aa_sov_monitor.tasks.check_campaigns',
             'schedule': crontab(minute='*/2'),
+            'apply_offset': True,
         }

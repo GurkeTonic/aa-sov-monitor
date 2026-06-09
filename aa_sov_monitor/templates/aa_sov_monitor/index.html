@@ -33,7 +33,7 @@
 {% block header_nav_collapse_right %}
 {% if perms.aa_sov_monitor.manage_sov %}
 <li class="nav-item">
-    <a href="{% url 'aa_sov_monitor:add_owner' %}" class="btn btn-primary btn-sm">+ Alliance hinzufügen</a>
+    <a href="{% url 'aa_sov_monitor:add_owner' %}" class="btn btn-primary btn-sm">+ Add Alliance</a>
 </li>
 {% endif %}
 {% endblock %}
@@ -43,7 +43,7 @@
     <div class="text-muted small mb-3">
         {% for owner in owners %}
             {{ owner.alliance.alliance_name }}:
-            {% if owner.last_updated %}Sync {{ owner.last_updated|date:"d.m.Y H:i" }} UTC{% else %}noch kein Sync{% endif %}
+            {% if owner.last_updated %}Synced {{ owner.last_updated|date:"Y-m-d H:i" }} UTC{% else %}not yet synced{% endif %}
             {% if not forloop.last %} &bull; {% endif %}
         {% endfor %}
     </div>
@@ -51,29 +51,29 @@
 
         <div class="tab-pane fade" id="tab-upgrades">
             {% if not pivot_rows %}
-            <div class="alert alert-info">Keine Upgrade-Daten. Upgrade-Sync abwarten.</div>
+            <div class="alert alert-info">No upgrade data. Waiting for upgrade sync.</div>
             {% else %}
             <div class="row g-2 mb-3">
                 <div class="col-auto">
                     <select id="pf-const" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">Alle Konstellationen</option>
+                        <option value="">All Constellations</option>
                         {% for c in upgrade_constellations %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
                     <select id="pf-type" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">Alle Upgrade-Typen</option>
+                        <option value="">All Upgrade Types</option>
                         {% for col in ordered_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
                     <select id="pf-level" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">Alle Stufen</option>
-                        {% for l in upgrade_levels %}<option value="{{ l }}">Stufe {{ l }}</option>{% endfor %}
+                        <option value="">All Levels</option>
+                        {% for l in upgrade_levels %}<option value="{{ l }}">Level {{ l }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="resetPF()">Zurücksetzen</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetPF()">Reset</button>
                 </div>
             </div>
             <div class="table-responsive">
@@ -81,7 +81,7 @@
                 <thead>
                     <tr class="table-dark">
                         <th>Region</th>
-                        <th>Konst.</th>
+                        <th>Const.</th>
                         <th>System</th>
                         {% for col in ordered_cols %}
                         <th class="text-center">{{ col }}</th>
@@ -115,15 +115,15 @@
 
         <div class="tab-pane fade" id="tab-campaigns">
             {% if not campaigns %}
-            <div class="alert alert-success">Keine aktiven SOV-Angriffe.</div>
+            <div class="alert alert-success">No active SOV attacks.</div>
             {% else %}
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
                         <th>System</th>
-                        <th>Typ</th>
-                        <th>Angreifer</th>
-                        <th>Verteidiger</th>
+                        <th>Type</th>
+                        <th>Attacker</th>
+                        <th>Defender</th>
                         <th>Start (UTC)</th>
                     </tr>
                 </thead>
@@ -134,7 +134,7 @@
                     <td>{{ c.event_type }}</td>
                     <td>{{ c.attacker_score|floatformat:2 }}</td>
                     <td>{{ c.defender_score|floatformat:2 }}</td>
-                    <td class="text-nowrap">{{ c.start_time|date:"d.m. H:i" }}</td>
+                    <td class="text-nowrap">{{ c.start_time|date:"Y-m-d H:i" }}</td>
                 </tr>
                 {% endfor %}
                 </tbody>
@@ -144,7 +144,7 @@
 
         <div class="tab-pane fade show active" id="tab-adm">
             {% if not systems %}
-            <div class="alert alert-info">Keine Systeme vorhanden. Alliance hinzufügen und Sync abwarten.</div>
+            <div class="alert alert-info">No systems found. Add an alliance and wait for sync.</div>
             {% else %}
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
@@ -152,9 +152,9 @@
                         <th>Region</th>
                         <th>System</th>
                         <th class="text-center">ADM</th>
-                        <th class="text-center">Industrie</th>
-                        <th class="text-center">Militär</th>
-                        <th class="text-center">Strategie</th>
+                        <th class="text-center">Industry</th>
+                        <th class="text-center">Military</th>
+                        <th class="text-center">Strategy</th>
                         <th class="text-center">Min (7d)</th>
                         <th class="text-center">Max (7d)</th>
                         <th class="text-center">IHUB</th>
@@ -182,8 +182,8 @@
                     <td class="text-center text-muted">{% if row.stats %}{{ row.stats.adm_min|floatformat:1 }}{% else %}&mdash;{% endif %}</td>
                     <td class="text-center text-muted">{% if row.stats %}{{ row.stats.adm_max|floatformat:1 }}{% else %}&mdash;{% endif %}</td>
                     <td class="text-center">{% if row.system.has_ihub %}<span class="text-success">&#10003;</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
-                    <td class="text-nowrap">{% if row.system.vulnerable_start %}{{ row.system.vulnerable_start|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
-                    <td class="text-nowrap">{% if row.system.vulnerable_end %}{{ row.system.vulnerable_end|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
+                    <td class="text-nowrap">{% if row.system.vulnerable_start %}{{ row.system.vulnerable_start|date:"Y-m-d H:i" }}{% else %}&mdash;{% endif %}</td>
+                    <td class="text-nowrap">{% if row.system.vulnerable_end %}{{ row.system.vulnerable_end|date:"Y-m-d H:i" }}{% else %}&mdash;{% endif %}</td>
                     <td>{{ row.system.owner.alliance.alliance_name }}</td>
                 </tr>
                 {% endfor %}
@@ -193,12 +193,12 @@
         </div>
 
         <div class="tab-pane fade" id="tab-rift">
-            <p class="text-muted small mb-2">IHUB-Upgrade-Daten in RIFT importieren.</p>
+            <p class="text-muted small mb-2">Import IHUB upgrade data into RIFT.</p>
             {% if rift_text %}
             <textarea id="riftExport" class="form-control font-monospace mb-2" rows="15" readonly>{{ rift_text }}</textarea>
-            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('riftExport').value).then(() => this.textContent='Kopiert!')">In Zwischenablage kopieren</button>
+            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('riftExport').value).then(() => this.textContent='Copied!')">Copy to clipboard</button>
             {% else %}
-            <div class="alert alert-info">Keine IHUB-Upgrade-Daten vorhanden.</div>
+            <div class="alert alert-info">No IHUB upgrade data available.</div>
             {% endif %}
         </div>
 
@@ -206,12 +206,12 @@
         {% if perms.aa_sov_monitor.view_manager %}
         <div class="tab-pane fade" id="tab-manager">
             {% if not manager_rows %}
-            <div class="alert alert-info">Keine Hub-Daten. Upgrade-Sync abwarten.</div>
+            <div class="alert alert-info">No hub data. Waiting for upgrade sync.</div>
             {% else %}
             <table class="table table-sm table-hover align-middle" style="font-size:0.85rem">
                 <thead class="table-dark">
                     <tr>
-                        <th>Konst.</th>
+                        <th>Const.</th>
                         <th>System</th>
                         <th class="text-center">Power</th>
                         <th class="text-center">Workforce</th>
@@ -251,7 +251,7 @@
                             {% else %}<span class="text-muted">&mdash;</span>{% endif %}
                         {% empty %}&mdash;{% endfor %}
                     </td>
-                    <td class="text-nowrap text-muted">{% if row.system.vulnerable_start %}{{ row.system.vulnerable_start|date:"d.m. H:i" }}{% else %}&mdash;{% endif %}</td>
+                    <td class="text-nowrap text-muted">{% if row.system.vulnerable_start %}{{ row.system.vulnerable_start|date:"Y-m-d H:i" }}{% else %}&mdash;{% endif %}</td>
                 </tr>
                 {% endfor %}
                 </tbody>

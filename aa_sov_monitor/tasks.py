@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_datetime
 from allianceauth.services.hooks import get_extension_logger
 from esi.models import Token
 
+from aa_sov_monitor import __version__
 from .models import SovOwner, SovSystem, SovUpgrade, SovCampaign, SovConfiguration, SovHubResource, SovHubReagent, AdmHistory
 
 logger = get_extension_logger(__name__)
@@ -21,7 +22,7 @@ ESI_HEADERS = {'X-Compatibility-Date': '2026-05-19'}
 
 def _get_user_agent():
     email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'unknown@example.com')
-    return f'aa-sov-monitor/0.1.2 ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
+    return f'aa-sov-monitor/{__version__} ({email}; +https://github.com/GurkeTonic/aa-sov-monitor)'
 
 
 def _handle_esi_response(resp):
@@ -187,12 +188,12 @@ def _send_campaign_alert(campaign):
         'station_freeport': 'Station Freeport',
     }
     embed = {
-        'title': f'SOV Angriff: {campaign.solar_system_name}',
+        'title': f'SOV Attack: {campaign.solar_system_name}',
         'color': 0xFF0000,
         'fields': [
             {'name': 'System', 'value': campaign.solar_system_name, 'inline': True},
-            {'name': 'Typ', 'value': labels.get(campaign.event_type, campaign.event_type), 'inline': True},
-            {'name': 'Start', 'value': campaign.start_time.strftime('%d.%m. %H:%M') + ' UTC', 'inline': True},
+            {'name': 'Type', 'value': labels.get(campaign.event_type, campaign.event_type), 'inline': True},
+            {'name': 'Start', 'value': campaign.start_time.strftime('%Y-%m-%d %H:%M') + ' UTC', 'inline': True},
         ],
         'footer': {'text': 'AA SOV Monitor'},
     }
@@ -212,7 +213,7 @@ def _send_adm_alert(systems, webhook_url):
         for s in systems
     ]
     embed = {
-        'title': f'⚠️ ADM Warning — {len(systems)} System{"e" if len(systems) > 1 else ""} unter 4.5',
+        'title': f'⚠️ ADM Warning — {len(systems)} System{"s" if len(systems) > 1 else ""} below 4.5',
         'color': 0xFF6600,
         'fields': fields,
         'footer': {'text': 'AA SOV Monitor'},
@@ -227,7 +228,7 @@ def _send_reagent_alert(system, level, reagents, webhook_url):
     color = 0xFF0000 if level == 'critical' else 0xFF9900
     label = 'CRITICAL' if level == 'critical' else 'Warning'
     fields = [
-        {'name': r['name'], 'value': f"{r['hours']}h verbleibend", 'inline': True}
+        {'name': r['name'], 'value': f"{r['hours']}h remaining", 'inline': True}
         for r in reagents
     ]
     embed = {
@@ -253,7 +254,7 @@ def _send_module_alert(system, changes, webhook_url):
         })
     any_offline = any(c['new'] != 'Online' for c in changes)
     embed = {
-        'title': f'\U0001f514 Modul-Status — {system.solar_system_name}',
+        'title': f'\U0001f514 Module Status — {system.solar_system_name}',
         'color': 0xFF0000 if any_offline else 0x00CC44,
         'fields': fields,
         'footer': {'text': 'AA SOV Monitor'},
@@ -347,7 +348,7 @@ def update_sov_data():
 @shared_task
 def update_sov_upgrades():
     for pk in SovOwner.objects.values_list('pk', flat=True):
-        update_owner_sov_upgrades.delay(pk)
+        update_owner_sov_upgrades.apply_async(args=[pk], priority=5)
 
 
 @shared_task(rate_limit='10/m')

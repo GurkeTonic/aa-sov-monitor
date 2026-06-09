@@ -22,12 +22,12 @@ class SovOwnerAdmin(admin.ModelAdmin):
     list_display = ['alliance', 'character', 'last_updated']
     actions = ['update_now']
 
-    @admin.action(description='Jetzt von ESI aktualisieren')
+    @admin.action(description='Update from ESI now')
     def update_now(self, request, queryset):
         from .tasks import update_sov_data, update_sov_upgrades
-        update_sov_data.delay()
-        update_sov_upgrades.delay()
-        self.message_user(request, 'SOV Update angestoßen.')
+        update_sov_data.apply_async(priority=5)
+        update_sov_upgrades.apply_async(priority=5)
+        self.message_user(request, 'SOV update triggered.')
 
 
 @admin.register(SovSystem)

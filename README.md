@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/GurkeTonic/aa-sov-monitor?label=release)](https://github.com/GurkeTonic/aa-sov-monitor/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green)](https://github.com/GurkeTonic/aa-sov-monitor/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/django-4.2%2B-green)](https://www.djangoproject.com/)
 [![Alliance Auth Compatibility](https://img.shields.io/badge/Alliance_Auth-v5-brightgreen)](https://gitlab.com/allianceauth/allianceauth)
 
@@ -106,9 +106,9 @@ Four independent webhooks can be configured in **Django Admin → AA SOV Monitor
 | Webhook | Trigger | Behaviour |
 | :--- | :--- | :--- |
 | **Campaigns** | New SOV attack detected | Immediate alert on new campaign |
-| **ADM-Alerts** | System ADM drops below 4.5 | All affected systems bundled in one post; resets automatically when ADM recovers above 4.5 |
-| **Reagent-Alerts** | Reagent fuel below 72h (Warning) or 24h (Critical) | Re-alerts on escalation from Warning → Critical |
-| **Modul-Alerts** | IHUB upgrade changes power state | Shows old state → new state with Online/Offline indicator |
+| **ADM Alerts** | System ADM drops below 4.5 | All affected systems bundled in one post; resets automatically when ADM recovers above 4.5 |
+| **Reagent Alerts** | Reagent fuel below 72h (Warning) or 24h (Critical) | Re-alerts on escalation from Warning → Critical |
+| **Module Alerts** | IHUB upgrade changes power state | Shows old state → new state with Online/Offline indicator |
 
 > [!NOTE]
 > All webhooks are optional. Alerts are only sent if a webhook URL is configured.
@@ -129,13 +129,13 @@ ______________________________________________________________________
 
 ### Adding an Alliance<a name="adding-an-alliance"></a>
 
-1. Click **+ Alliance hinzufügen** in the top navbar (requires `manage_sov` permission)
+1. Click **+ Add Alliance** in the top navbar (requires `manage_sov` permission)
 2. Authorize the ESI token for a character in the alliance's holding corporation
 
 > [!IMPORTANT]
 > The character must be a director or have the **Starbase Fuel Technician** role in their corporation for upgrade and reagent data to sync correctly.
 
-3. Wait for the next scheduled sync or trigger a manual update from **Django Admin → Sov Owners → Actions → Jetzt von ESI aktualisieren**
+3. Wait for the next scheduled sync or trigger a manual update from **Django Admin → Sov Owners → Actions → Update from ESI now**
 
 ### Tabs<a name="tabs"></a>
 

@@ -1,15 +1,27 @@
 from django.db import models
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
 
+
+class General(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (
+            ('view_sov', 'Can view SOV Monitor'),
+            ('manage_sov', 'Can manage SOV Monitor alliances'),
+            ('view_manager', 'Can view SOV Monitor Manager tab'),
+        )
+
+
 class SovConfiguration(models.Model):
     discord_webhook_url = models.URLField(blank=True, verbose_name='Webhook: Campaigns')
-    webhook_adm = models.URLField(blank=True, verbose_name='Webhook: ADM-Alerts')
-    webhook_reagent = models.URLField(blank=True, verbose_name='Webhook: Reagent-Alerts')
-    webhook_module = models.URLField(blank=True, verbose_name='Webhook: Modul-Alerts')
+    webhook_adm = models.URLField(blank=True, verbose_name='Webhook: ADM Alerts')
+    webhook_reagent = models.URLField(blank=True, verbose_name='Webhook: Reagent Alerts')
+    webhook_module = models.URLField(blank=True, verbose_name='Webhook: Module Alerts')
     class Meta:
         default_permissions = ()
     def __str__(self):
-        return 'SOV Monitor Konfiguration'
+        return 'SOV Monitor Configuration'
     @classmethod
     def _get(cls, field):
         config = cls.objects.first()
@@ -33,11 +45,6 @@ class SovOwner(models.Model):
     last_updated = models.DateTimeField(null=True, blank=True)
     class Meta:
         default_permissions = ()
-        permissions = (
-            ('view_sov', 'Can view SOV Monitor'),
-            ('manage_sov', 'Can manage SOV Monitor alliances'),
-            ('view_manager', 'Can view SOV Monitor Manager tab'),
-        )
     def __str__(self):
         return self.alliance.alliance_name
 
