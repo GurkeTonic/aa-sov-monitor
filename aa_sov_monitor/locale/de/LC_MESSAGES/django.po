@@ -1,0 +1,221 @@
+# German translation for aa-sov-monitor.
+# Copyright (C) 2026 GurkeTonic
+# This file is distributed under the same license as the aa-sov-monitor package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: aa-sov-monitor\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-12 17:54+0000\n"
+"PO-Revision-Date: 2026-06-12 19:50+0000\n"
+"Last-Translator: GurkeTonic\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: admin.py:9
+msgid "Discord Webhooks"
+msgstr "Discord-Webhooks"
+
+#: admin.py:26
+msgid "Update from ESI now"
+msgstr "Jetzt von ESI aktualisieren"
+
+#: admin.py:31
+msgid "SOV update triggered."
+msgstr "SOV-Aktualisierung ausgelöst."
+
+#: templates/aa_sov_monitor/index.html:4 templates/aa_sov_monitor/index.html:6
+msgid "SOV Monitor"
+msgstr "SOV Monitor"
+
+#: templates/aa_sov_monitor/index.html:11
+#: templates/aa_sov_monitor/index.html:151
+msgid "ADM"
+msgstr "ADM"
+
+#: templates/aa_sov_monitor/index.html:16
+msgid "Upgrades"
+msgstr "Upgrades"
+
+#: templates/aa_sov_monitor/index.html:21
+msgid "Campaigns"
+msgstr "Kampagnen"
+
+#: templates/aa_sov_monitor/index.html:25
+msgid "RIFT Export"
+msgstr "RIFT-Export"
+
+#: templates/aa_sov_monitor/index.html:29
+msgid "Manager"
+msgstr "Manager"
+
+#: templates/aa_sov_monitor/index.html:37
+msgid "+ Add Alliance"
+msgstr "+ Allianz hinzufügen"
+
+#: templates/aa_sov_monitor/index.html:45
+#, python-format
+msgid "Last sync %(ts)s UTC · %(counter)s alliance"
+msgid_plural "Last sync %(ts)s UTC · %(counter)s alliances"
+msgstr[0] "Letzter Sync %(ts)s UTC · %(counter)s Allianz"
+msgstr[1] "Letzter Sync %(ts)s UTC · %(counter)s Allianzen"
+
+#: templates/aa_sov_monitor/index.html:45
+msgid "not yet synced"
+msgstr "noch nicht synchronisiert"
+
+#: templates/aa_sov_monitor/index.html:51
+msgid "No upgrade data. Waiting for upgrade sync."
+msgstr "Keine Upgrade-Daten. Warte auf Upgrade-Sync."
+
+#: templates/aa_sov_monitor/index.html:56
+msgid "All Constellations"
+msgstr "Alle Konstellationen"
+
+#: templates/aa_sov_monitor/index.html:62
+msgid "All Upgrade Types"
+msgstr "Alle Upgrade-Typen"
+
+#: templates/aa_sov_monitor/index.html:68
+msgid "All Levels"
+msgstr "Alle Stufen"
+
+#: templates/aa_sov_monitor/index.html:69
+#, python-format
+msgid "Level %(l)s"
+msgstr "Stufe %(l)s"
+
+#: templates/aa_sov_monitor/index.html:73
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+#: templates/aa_sov_monitor/index.html:80
+#: templates/aa_sov_monitor/index.html:149
+msgid "Region"
+msgstr "Region"
+
+#: templates/aa_sov_monitor/index.html:81
+#: templates/aa_sov_monitor/index.html:211
+msgid "Const."
+msgstr "Konst."
+
+#: templates/aa_sov_monitor/index.html:82
+#: templates/aa_sov_monitor/index.html:120
+#: templates/aa_sov_monitor/index.html:150
+#: templates/aa_sov_monitor/index.html:212
+msgid "System"
+msgstr "System"
+
+#: templates/aa_sov_monitor/index.html:98
+msgid "Pending"
+msgstr "Ausstehend"
+
+#: templates/aa_sov_monitor/index.html:115
+msgid "No active SOV attacks."
+msgstr "Keine aktiven SOV-Angriffe."
+
+#: templates/aa_sov_monitor/index.html:121
+msgid "Type"
+msgstr "Typ"
+
+#: templates/aa_sov_monitor/index.html:122
+msgid "Attacker"
+msgstr "Angreifer"
+
+#: templates/aa_sov_monitor/index.html:123
+msgid "Defender"
+msgstr "Verteidiger"
+
+#: templates/aa_sov_monitor/index.html:124
+msgid "Start (UTC)"
+msgstr "Start (UTC)"
+
+#: templates/aa_sov_monitor/index.html:144
+msgid "No systems found. Add an alliance and wait for sync."
+msgstr "Keine Systeme gefunden. Allianz hinzufügen und auf Sync warten."
+
+#: templates/aa_sov_monitor/index.html:152
+msgid "Industry"
+msgstr "Industrie"
+
+#: templates/aa_sov_monitor/index.html:153
+msgid "Military"
+msgstr "Militär"
+
+#: templates/aa_sov_monitor/index.html:154
+msgid "Strategy"
+msgstr "Strategie"
+
+#: templates/aa_sov_monitor/index.html:155
+msgid "Min (7d)"
+msgstr "Min (7T)"
+
+#: templates/aa_sov_monitor/index.html:156
+msgid "Max (7d)"
+msgstr "Max (7T)"
+
+#: templates/aa_sov_monitor/index.html:157
+msgid "IHUB"
+msgstr "IHUB"
+
+#: templates/aa_sov_monitor/index.html:158
+#: templates/aa_sov_monitor/index.html:216
+msgid "Vuln Start"
+msgstr "Vuln-Start"
+
+#: templates/aa_sov_monitor/index.html:159
+msgid "Vuln End"
+msgstr "Vuln-Ende"
+
+#: templates/aa_sov_monitor/index.html:160
+msgid "Alliance"
+msgstr "Allianz"
+
+#: templates/aa_sov_monitor/index.html:193
+msgid "Import IHUB upgrade data into RIFT."
+msgstr "IHUB-Upgrade-Daten in RIFT importieren."
+
+#: templates/aa_sov_monitor/index.html:196
+msgid "Copied!"
+msgstr "Kopiert!"
+
+#: templates/aa_sov_monitor/index.html:196
+msgid "Copy to clipboard"
+msgstr "In Zwischenablage kopieren"
+
+#: templates/aa_sov_monitor/index.html:198
+msgid "No IHUB upgrade data available."
+msgstr "Keine IHUB-Upgrade-Daten verfügbar."
+
+#: templates/aa_sov_monitor/index.html:206
+msgid "No hub data. Waiting for upgrade sync."
+msgstr "Keine Hub-Daten. Warte auf Upgrade-Sync."
+
+#: templates/aa_sov_monitor/index.html:213
+msgid "Power"
+msgstr "Energie"
+
+#: templates/aa_sov_monitor/index.html:214
+msgid "Workforce"
+msgstr "Arbeitskräfte"
+
+#: templates/aa_sov_monitor/index.html:215
+msgid "Reagent"
+msgstr "Reagenz"
+
+#: views.py:134
+msgid "Character not found in Auth."
+msgstr "Charakter nicht in Auth gefunden."
+
+#: views.py:137
+msgid "Character is not in an alliance."
+msgstr "Charakter ist in keiner Allianz."
+
+#: views.py:144
+#, python-format
+msgid "%(alliance)s added to SOV Monitor."
+msgstr "%(alliance)s zum SOV Monitor hinzugefügt."

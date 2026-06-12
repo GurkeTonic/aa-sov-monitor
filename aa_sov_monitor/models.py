@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
 
 
@@ -18,10 +19,27 @@ class SovConfiguration(models.Model):
     webhook_adm = models.URLField(blank=True, verbose_name='Webhook: ADM Alerts')
     webhook_reagent = models.URLField(blank=True, verbose_name='Webhook: Reagent Alerts')
     webhook_module = models.URLField(blank=True, verbose_name='Webhook: Module Alerts')
+    last_full_sync = models.DateTimeField(null=True, blank=True, help_text='Timestamp of the last full ESI sync run')
     class Meta:
         default_permissions = ()
     def __str__(self):
         return 'SOV Monitor Configuration'
+    @classmethod
+    def solo(cls):
+        """Return the singleton config row, creating it if needed."""
+        config = cls.objects.first()
+        if config is None:
+            config = cls.objects.create()
+        return config
+    @classmethod
+    def mark_synced(cls):
+        config = cls.solo()
+        config.last_full_sync = timezone.now()
+        config.save(update_fields=['last_full_sync'])
+    @classmethod
+    def get_last_sync(cls):
+        config = cls.objects.first()
+        return config.last_full_sync if config else None
     @classmethod
     def _get(cls, field):
         config = cls.objects.first()
@@ -59,7 +77,6 @@ class SovSystem(models.Model):
     military_level = models.IntegerField(default=0)
     strategic_level = models.IntegerField(default=0)
     has_ihub = models.BooleanField(default=False)
-    has_tcu = models.BooleanField(default=False)
     vulnerable_start = models.DateTimeField(null=True, blank=True)
     vulnerable_end = models.DateTimeField(null=True, blank=True)
     adm_alert_sent = models.BooleanField(default=False)

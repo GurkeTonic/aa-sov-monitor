@@ -1,11 +1,12 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import SovConfiguration, SovOwner, SovSystem, SovCampaign, SovUpgrade, SovHubResource, SovHubReagent, AdmHistory
 
 
 @admin.register(SovConfiguration)
 class SovConfigurationAdmin(admin.ModelAdmin):
     fieldsets = (
-        ('Discord Webhooks', {
+        (_('Discord Webhooks'), {
             'fields': ('discord_webhook_url', 'webhook_adm', 'webhook_reagent', 'webhook_module'),
         }),
     )
@@ -22,18 +23,18 @@ class SovOwnerAdmin(admin.ModelAdmin):
     list_display = ['alliance', 'character', 'last_updated']
     actions = ['update_now']
 
-    @admin.action(description='Update from ESI now')
+    @admin.action(description=_('Update from ESI now'))
     def update_now(self, request, queryset):
         from .tasks import update_sov_data, update_sov_upgrades
         update_sov_data.apply_async(priority=5)
         update_sov_upgrades.apply_async(priority=5)
-        self.message_user(request, 'SOV update triggered.')
+        self.message_user(request, _('SOV update triggered.'))
 
 
 @admin.register(SovSystem)
 class SovSystemAdmin(admin.ModelAdmin):
-    list_display = ['solar_system_name', 'constellation_name', 'region_name', 'adm', 'has_ihub', 'has_tcu']
-    list_filter = ['region_name', 'has_ihub', 'has_tcu']
+    list_display = ['solar_system_name', 'constellation_name', 'region_name', 'adm', 'has_ihub']
+    list_filter = ['region_name', 'has_ihub']
     search_fields = ['solar_system_name', 'constellation_name', 'region_name']
 
 

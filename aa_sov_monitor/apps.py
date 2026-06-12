@@ -3,6 +3,7 @@ from aa_sov_monitor import __version__
 
 
 class AaSovMonitorConfig(AppConfig):
+    default_auto_field = 'django.db.models.AutoField'
     name = 'aa_sov_monitor'
     label = 'aa_sov_monitor'
     verbose_name = f'SOV Monitor v{__version__}'

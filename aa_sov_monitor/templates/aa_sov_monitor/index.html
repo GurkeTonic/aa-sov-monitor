@@ -1,31 +1,32 @@
 {% extends 'allianceauth/base-bs5.html' %}
+{% load i18n %}
 {% load humanize %}
-{% block page_title %}SOV Monitor{% endblock %}
+{% block page_title %}{% translate "SOV Monitor" %}{% endblock %}
 
-{% block header_nav_brand %}SOV Monitor{% endblock %}
+{% block header_nav_brand %}{% translate "SOV Monitor" %}{% endblock %}
 
 {% block header_nav_collapse_left %}
 <li class="nav-item">
     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-adm" type="button">
-        ADM{% if adm_rows %} <span class="badge bg-secondary">{{ adm_rows|length }}</span>{% endif %}
+        {% translate "ADM" %}{% if adm_rows %} <span class="badge bg-secondary">{{ adm_rows|length }}</span>{% endif %}
     </button>
 </li>
 <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-upgrades" type="button">
-        Upgrades <span class="badge bg-secondary">{{ upgrade_count }}</span>
+        {% translate "Upgrades" %} <span class="badge bg-secondary">{{ upgrade_count }}</span>
     </button>
 </li>
 <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-campaigns" type="button">
-        Campaigns{% if active_campaigns %} <span class="badge bg-danger">{{ active_campaigns }}</span>{% endif %}
+        {% translate "Campaigns" %}{% if active_campaigns %} <span class="badge bg-danger">{{ active_campaigns }}</span>{% endif %}
     </button>
 </li>
 <li class="nav-item">
-    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rift" type="button">RIFT Export</button>
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rift" type="button">{% translate "RIFT Export" %}</button>
 </li>
 {% if perms.aa_sov_monitor.view_manager %}
 <li class="nav-item">
-    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-manager" type="button">Manager</button>
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-manager" type="button">{% translate "Manager" %}</button>
 </li>
 {% endif %}
 {% endblock %}
@@ -33,7 +34,7 @@
 {% block header_nav_collapse_right %}
 {% if perms.aa_sov_monitor.manage_sov %}
 <li class="nav-item">
-    <a href="{% url 'aa_sov_monitor:add_owner' %}" class="btn btn-primary btn-sm">+ Add Alliance</a>
+    <a href="{% url 'aa_sov_monitor:add_owner' %}" class="btn btn-primary btn-sm">{% translate "+ Add Alliance" %}</a>
 </li>
 {% endif %}
 {% endblock %}
@@ -41,48 +42,44 @@
 {% block content %}
 <div class="container-fluid">
     <div class="text-muted small mb-3">
-        {% for owner in owners %}
-            {{ owner.alliance.alliance_name }}:
-            {% if owner.last_updated %}Synced {{ owner.last_updated|date:"Y-m-d H:i" }} UTC{% else %}not yet synced{% endif %}
-            {% if not forloop.last %} &bull; {% endif %}
-        {% endfor %}
+        {% if last_sync %}{% blocktranslate with ts=last_sync|date:"Y-m-d H:i" count counter=owner_count %}Last sync {{ ts }} UTC · {{ counter }} alliance{% plural %}Last sync {{ ts }} UTC · {{ counter }} alliances{% endblocktranslate %}{% else %}{% translate "not yet synced" %}{% endif %}
     </div>
     <div class="tab-content">
 
         <div class="tab-pane fade" id="tab-upgrades">
             {% if not pivot_rows %}
-            <div class="alert alert-info">No upgrade data. Waiting for upgrade sync.</div>
+            <div class="alert alert-info">{% translate "No upgrade data. Waiting for upgrade sync." %}</div>
             {% else %}
             <div class="row g-2 mb-3">
                 <div class="col-auto">
                     <select id="pf-const" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">All Constellations</option>
+                        <option value="">{% translate "All Constellations" %}</option>
                         {% for c in upgrade_constellations %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
                     <select id="pf-type" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">All Upgrade Types</option>
+                        <option value="">{% translate "All Upgrade Types" %}</option>
                         {% for col in ordered_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
                     <select id="pf-level" class="form-select form-select-sm" onchange="applyPF()">
-                        <option value="">All Levels</option>
-                        {% for l in upgrade_levels %}<option value="{{ l }}">Level {{ l }}</option>{% endfor %}
+                        <option value="">{% translate "All Levels" %}</option>
+                        {% for l in upgrade_levels %}<option value="{{ l }}">{% blocktranslate %}Level {{ l }}{% endblocktranslate %}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="resetPF()">Reset</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetPF()">{% translate "Reset" %}</button>
                 </div>
             </div>
             <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle" id="pivot-table" style="font-size:0.85rem">
                 <thead>
                     <tr class="table-dark">
-                        <th>Region</th>
-                        <th>Const.</th>
-                        <th>System</th>
+                        <th>{% translate "Region" %}</th>
+                        <th>{% translate "Const." %}</th>
+                        <th>{% translate "System" %}</th>
                         {% for col in ordered_cols %}
                         <th class="text-center">{{ col }}</th>
                         {% endfor %}
@@ -98,7 +95,7 @@
                     <td class="text-center pc" data-col="{{ col_name }}" data-lv="{{ cell.0|default:0 }}">
                         {% if cell.0 %}
                             {% if cell.1 == 'Online' or cell.1 == 'Low' %}<span class="badge bg-success">{{ cell.0 }}</span>
-                            {% elif cell.1 == 'Pending' %}<span class="badge bg-secondary" title="Pending">{{ cell.0 }}</span>
+                            {% elif cell.1 == 'Pending' %}<span class="badge bg-secondary" title="{% translate 'Pending' %}">{{ cell.0 }}</span>
                             {% elif cell.1 == 'Offline' %}<span class="badge bg-danger">{{ cell.0 }}</span>
                             {% else %}<span class="badge bg-danger" title="{{ cell.1 }}">{{ cell.0 }}</span>
                             {% endif %}
@@ -115,16 +112,16 @@
 
         <div class="tab-pane fade" id="tab-campaigns">
             {% if not campaigns %}
-            <div class="alert alert-success">No active SOV attacks.</div>
+            <div class="alert alert-success">{% translate "No active SOV attacks." %}</div>
             {% else %}
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>System</th>
-                        <th>Type</th>
-                        <th>Attacker</th>
-                        <th>Defender</th>
-                        <th>Start (UTC)</th>
+                        <th>{% translate "System" %}</th>
+                        <th>{% translate "Type" %}</th>
+                        <th>{% translate "Attacker" %}</th>
+                        <th>{% translate "Defender" %}</th>
+                        <th>{% translate "Start (UTC)" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -144,23 +141,23 @@
 
         <div class="tab-pane fade show active" id="tab-adm">
             {% if not systems %}
-            <div class="alert alert-info">No systems found. Add an alliance and wait for sync.</div>
+            <div class="alert alert-info">{% translate "No systems found. Add an alliance and wait for sync." %}</div>
             {% else %}
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>Region</th>
-                        <th>System</th>
-                        <th class="text-center">ADM</th>
-                        <th class="text-center">Industry</th>
-                        <th class="text-center">Military</th>
-                        <th class="text-center">Strategy</th>
-                        <th class="text-center">Min (7d)</th>
-                        <th class="text-center">Max (7d)</th>
-                        <th class="text-center">IHUB</th>
-                        <th>Vuln Start</th>
-                        <th>Vuln End</th>
-                        <th>Alliance</th>
+                        <th>{% translate "Region" %}</th>
+                        <th>{% translate "System" %}</th>
+                        <th class="text-center">{% translate "ADM" %}</th>
+                        <th class="text-center">{% translate "Industry" %}</th>
+                        <th class="text-center">{% translate "Military" %}</th>
+                        <th class="text-center">{% translate "Strategy" %}</th>
+                        <th class="text-center">{% translate "Min (7d)" %}</th>
+                        <th class="text-center">{% translate "Max (7d)" %}</th>
+                        <th class="text-center">{% translate "IHUB" %}</th>
+                        <th>{% translate "Vuln Start" %}</th>
+                        <th>{% translate "Vuln End" %}</th>
+                        <th>{% translate "Alliance" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -193,12 +190,12 @@
         </div>
 
         <div class="tab-pane fade" id="tab-rift">
-            <p class="text-muted small mb-2">Import IHUB upgrade data into RIFT.</p>
+            <p class="text-muted small mb-2">{% translate "Import IHUB upgrade data into RIFT." %}</p>
             {% if rift_text %}
             <textarea id="riftExport" class="form-control font-monospace mb-2" rows="15" readonly>{{ rift_text }}</textarea>
-            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('riftExport').value).then(() => this.textContent='Copied!')">Copy to clipboard</button>
+            <button class="btn btn-primary" data-copy-label="{% translate 'Copied!' %}" onclick="navigator.clipboard.writeText(document.getElementById('riftExport').value).then(() => this.textContent=this.dataset.copyLabel)">{% translate "Copy to clipboard" %}</button>
             {% else %}
-            <div class="alert alert-info">No IHUB upgrade data available.</div>
+            <div class="alert alert-info">{% translate "No IHUB upgrade data available." %}</div>
             {% endif %}
         </div>
 
@@ -206,17 +203,17 @@
         {% if perms.aa_sov_monitor.view_manager %}
         <div class="tab-pane fade" id="tab-manager">
             {% if not manager_rows %}
-            <div class="alert alert-info">No hub data. Waiting for upgrade sync.</div>
+            <div class="alert alert-info">{% translate "No hub data. Waiting for upgrade sync." %}</div>
             {% else %}
             <table class="table table-sm table-hover align-middle" style="font-size:0.85rem">
                 <thead class="table-dark">
                     <tr>
-                        <th>Const.</th>
-                        <th>System</th>
-                        <th class="text-center">Power</th>
-                        <th class="text-center">Workforce</th>
-                        <th>Reagent</th>
-                        <th>Vuln Start</th>
+                        <th>{% translate "Const." %}</th>
+                        <th>{% translate "System" %}</th>
+                        <th class="text-center">{% translate "Power" %}</th>
+                        <th class="text-center">{% translate "Workforce" %}</th>
+                        <th>{% translate "Reagent" %}</th>
+                        <th>{% translate "Vuln Start" %}</th>
                     </tr>
                 </thead>
                 <tbody>

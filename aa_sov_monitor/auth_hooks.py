@@ -4,7 +4,7 @@ import aa_sov_monitor.urls
 
 class SovMenuItemHook(MenuItemHook):
     def __init__(self):
-        super().__init__('SOV Monitor', 'fas fa-globe fa-fw', 'aa_sov_monitor:index', 160)
+        super().__init__('SOV Monitor', 'fas fa-globe fa-fw', 'aa_sov_monitor:index', 9999)
     def render(self, request):
         if request.user.has_perm('aa_sov_monitor.view_sov'):
             return MenuItemHook.render(self, request)

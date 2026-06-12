@@ -40,31 +40,29 @@ An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin to monit
 
 ## Installation
 
+> Not on PyPI — install from GitHub. `django-esi` and `django-eveonline-sde`
+> are pulled in automatically as dependencies.
+
 **Step 1 — Install the package**
 
     pip install git+https://github.com/GurkeTonic/aa-sov-monitor.git
 
-**Step 2 — Install EVE SDE (if not already present)**
-
-    pip install django-eveonline-sde
-
-**Step 3 — Add to `INSTALLED_APPS` in `local.py`**
+**Step 2 — Add to `INSTALLED_APPS` in `local.py`**
 
     INSTALLED_APPS += [
         'aa_sov_monitor',
         'eve_sde',
     ]
 
-**Step 4 — Run migrations and collect static**
+**Step 3 — Run migrations**
 
     python manage.py migrate
-    python manage.py collectstatic
 
-**Step 5 — Load SDE data**
+**Step 4 — Load the EVE SDE (system/constellation/region and type names)**
 
-    python manage.py import_sde
+    python manage.py esde_load_sde
 
-**Step 6 — Restart services**
+**Step 5 — Restart services**
 
     sudo supervisorctl restart myauth:
 
@@ -73,7 +71,7 @@ An [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) plugin to monit
 ## Setup
 
 1. Open **SOV Monitor** in the Alliance Auth navigation menu
-2. Click **+ Add Alliance** and authenticate with a character that has the **Starbase Fuel Technician** or director role in the holding corporation
+2. Click **+ Add Alliance** and authenticate with a character that has the **Station Manager** role in the holding corporation
 3. The first sync runs automatically within 15 minutes, or trigger it manually via **Django Admin → Sov Owners → Actions → Update from ESI now**
 
 ---

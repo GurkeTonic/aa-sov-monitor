@@ -1,25 +1,69 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = [
+    "hatchling",
+]
 
 [project]
 name = "aa-sov-monitor"
 description = "Alliance Auth plugin to monitor EVE Online sovereignty and IHUB upgrades"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "GurkeTonic", email = "pberbuir@googlemail.com" },
+]
 requires-python = ">=3.10,<3.14"
-authors = [{ name = "GurkeTonic", email = "pberbuir@googlemail.com" }]
-dependencies = ["allianceauth>=5.1.0"]
-dynamic = ["version"]
-
-[project.urls]
-Homepage = "https://github.com/GurkeTonic/aa-sov-monitor"
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dynamic = [
+    "version",
+]
+dependencies = [
+    "allianceauth>=5.1.0",
+    "django-esi>=4",
+    "django-eveonline-sde",
+]
 
 [project.entry-points."allianceauth.app"]
 aa_sov_monitor = "aa_sov_monitor.apps:AaSovMonitorConfig"
 
-[tool.hatch.version]
-path = "aa_sov_monitor/__init__.py"
+[project.urls]
+Homepage = "https://github.com/GurkeTonic/aa-sov-monitor"
+Source = "https://github.com/GurkeTonic/aa-sov-monitor"
+Tracker = "https://github.com/GurkeTonic/aa-sov-monitor/issues"
+Changelog = "https://github.com/GurkeTonic/aa-sov-monitor/blob/main/CHANGELOG.md"
 
-[tool.hatch.build.targets.wheel]
-include = ["/aa_sov_monitor"]
+[tool.hatch]
+build.include = [
+    "/aa_sov_monitor",
+]
+version.path = "aa_sov_monitor/__init__.py"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+known_first_party = ["aa_sov_monitor"]
+
+[tool.pylint.messages_control]
+disable = ["C0114", "C0115", "C0116", "R0903"]
+
+[tool.coverage.run]
+source = ["aa_sov_monitor"]
+branch = true
+omit = [
+    "aa_sov_monitor/migrations/*",
+    "aa_sov_monitor/tests/*",
+]

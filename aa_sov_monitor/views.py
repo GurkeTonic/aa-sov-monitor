@@ -7,15 +7,15 @@ from django.db.models import Min, Max
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from allianceauth.eveonline.models import EveCharacter, EveAllianceInfo
 from allianceauth.services.hooks import get_extension_logger
 from esi.decorators import token_required
 
-from .models import SovOwner, SovSystem, SovCampaign, AdmHistory
+from .constants import RIFT_ALLOWED
+from .models import SovOwner, SovSystem, SovCampaign, SovConfiguration, AdmHistory
 
 logger = get_extension_logger(__name__)
-
-RIFT_ALLOWED = {'Major Threat Detection Array', 'Minor Threat Detection Array', 'Exploration Detector'}
 
 
 def _base_name(type_name):
@@ -25,7 +25,7 @@ def _base_name(type_name):
 
 @permission_required('aa_sov_monitor.view_sov')
 def index(request):
-    owners = SovOwner.objects.select_related('alliance').all()
+    owner_count = SovOwner.objects.count()
     systems = list(
         SovSystem.objects
         .select_related('owner__alliance', 'hub_resource')
@@ -109,7 +109,8 @@ def index(request):
     )
 
     return render(request, 'aa_sov_monitor/index.html', {
-        'owners': owners,
+        'last_sync': SovConfiguration.get_last_sync(),
+        'owner_count': owner_count,
         'systems': systems,
         'campaigns': campaigns,
         'rift_text': '\n'.join(rift_lines),
@@ -130,17 +131,17 @@ def add_owner(request, token):
     try:
         character = EveCharacter.objects.get(character_id=token.character_id)
     except EveCharacter.DoesNotExist:
-        messages.error(request, 'Character not found in Auth.')
+        messages.error(request, _('Character not found in Auth.'))
         return redirect('aa_sov_monitor:index')
     if not character.alliance_id:
-        messages.error(request, 'Character is not in an alliance.')
+        messages.error(request, _('Character is not in an alliance.'))
         return redirect('aa_sov_monitor:index')
     try:
         alliance = EveAllianceInfo.objects.get(alliance_id=character.alliance_id)
     except EveAllianceInfo.DoesNotExist:
         alliance = EveAllianceInfo.objects.create_alliance(character.alliance_id)
     SovOwner.objects.update_or_create(alliance=alliance, defaults={'character': character})
-    messages.success(request, f'{alliance.alliance_name} added to SOV Monitor.')
+    messages.success(request, _('%(alliance)s added to SOV Monitor.') % {'alliance': alliance.alliance_name})
     return redirect('aa_sov_monitor:index')
 
 
